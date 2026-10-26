@@ -46,6 +46,8 @@ Veyra is written in Rust and requires Rust 1.88 or later.
 cargo install --path crates/veyra-cli
 ```
 
+Syntax highlighting for VS Code lives in [editors/vscode](editors/vscode).
+
 ## Quick start
 
 ```bash

@@ -1,0 +1,47 @@
+{
+  "name": "veyra",
+  "displayName": "Veyra",
+  "description": "Syntax highlighting and snippets for the Veyra UI DSL",
+  "version": "0.1.0",
+  "publisher": "Doctor-yoi",
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Doctor-yoi/Veyra"
+  },
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "veyra",
+        "aliases": [
+          "Veyra",
+          "vey"
+        ],
+        "extensions": [
+          ".vey"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "veyra",
+        "scopeName": "source.veyra",
+        "path": "./syntaxes/veyra.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "veyra",
+        "path": "./snippets/veyra.json"
+      }
+    ]
+  }
+}
