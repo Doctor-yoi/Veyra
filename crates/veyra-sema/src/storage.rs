@@ -473,6 +473,131 @@ impl<'a> Checker<'a> {
     }
 }
 
+impl<'a> Checker<'a> {
+    pub(crate) fn check_settings(&mut self, d: &'a ast::FieldsDecl) {
+        let mut fields: Vec<ir::SettingField> = Vec::new();
+        for f in self.prune_decls(&d.fields) {
+            self.check_member_name(&f.name);
+            if fields.iter().any(|x| x.name == f.name.name) {
+                self.error(
+                    "V1003",
+                    format!("字段`{}`重复", f.name.name),
+                    f.name.span,
+                    "",
+                );
+                continue;
+            }
+            for attr in &f.attrs {
+                self.error(
+                    "V2040",
+                    format!("settings字段不支持`@{}`", attr.name.name),
+                    attr.span,
+                    "",
+                );
+            }
+            let ty = self.resolve_type(&f.ty, TypePos::Value);
+            if !ty.is_unknown() && !storable(&ty) {
+                self.diags.push(
+                    Diagnostic::error("V5020", format!("settings字段不能是`{ty}`"))
+                        .with_label(f.ty.span, "")
+                        .with_note("可用的类型：Bool、Int、Double、String、Date、枚举及其可选类型"),
+                );
+            }
+            let sc = crate::expr::Scope::new(crate::expr::Owner::Constant, false);
+            let default = match &f.default {
+                Some(e) => self.expr(&sc, e, Some(&ty)),
+                None if ty.is_optional() => ir::Expr::new(ir::ExprKind::Nil, ty.clone()),
+                None => {
+                    if *ty.unwrap_optional() == Type::Date {
+                        self.error(
+                            "V5021",
+                            "Date类型的settings字段必须是可选类型",
+                            f.ty.span,
+                            "",
+                        );
+                    } else if !ty.is_unknown() {
+                        self.error(
+                            "V2010",
+                            format!("settings字段`{}`需要默认值", f.name.name),
+                            f.name.span,
+                            "",
+                        );
+                    }
+                    ir::Expr::unknown()
+                }
+            };
+            fields.push(ir::SettingField {
+                name: f.name.name.clone(),
+                ty,
+                default,
+            });
+        }
+        self.settings.insert(
+            d.name.name.clone(),
+            ir::SettingsDef {
+                name: d.name.name.clone(),
+                fields,
+            },
+        );
+    }
+
+    pub(crate) fn check_secure(&mut self, d: &'a ast::FieldsDecl) {
+        let mut fields: Vec<FieldDef> = Vec::new();
+        for f in self.prune_decls(&d.fields) {
+            self.check_member_name(&f.name);
+            if fields.iter().any(|x| x.name == f.name.name) {
+                self.error(
+                    "V1003",
+                    format!("字段`{}`重复", f.name.name),
+                    f.name.span,
+                    "",
+                );
+                continue;
+            }
+            if let Some(e) = &f.default {
+                self.error(
+                    "V2041",
+                    "secure字段不能有默认值",
+                    e.span,
+                    "凭证在首次写入前为空",
+                );
+            }
+            for attr in &f.attrs {
+                self.error(
+                    "V2040",
+                    format!("secure字段不支持`@{}`", attr.name.name),
+                    attr.span,
+                    "",
+                );
+            }
+            let ty = self.resolve_type(&f.ty, TypePos::Value);
+            let ty = ty.unwrap_optional().clone();
+            if !matches!(
+                ty,
+                Type::String | Type::Int | Type::Double | Type::Bool | Type::Unknown
+            ) {
+                self.error(
+                    "V5022",
+                    format!("secure字段不能是`{ty}`"),
+                    f.ty.span,
+                    "可用的类型：String、Int、Double、Bool",
+                );
+            }
+            fields.push(FieldDef {
+                name: f.name.name.clone(),
+                ty,
+            });
+        }
+        self.secures.insert(
+            d.name.name.clone(),
+            ir::SecureDef {
+                name: d.name.name.clone(),
+                fields,
+            },
+        );
+    }
+}
+
 fn ast_ident(e: &ast::Expr) -> &str {
     match &e.kind {
         A::Ident(n) => n,

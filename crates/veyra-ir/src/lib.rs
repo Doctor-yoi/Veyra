@@ -55,6 +55,8 @@ pub struct Program {
     pub repositories: Vec<RepositoryDef>,
     pub entities: Vec<EntityDef>,
     pub stores: Vec<StoreDef>,
+    pub settings: Vec<SettingsDef>,
+    pub secures: Vec<SecureDef>,
     pub components: Vec<ComponentDef>,
     pub screens: Vec<ScreenDef>,
     /// 本平台用到的全部本地化文案
@@ -145,6 +147,8 @@ pub struct RepositoryDef {
 pub enum InjectKind {
     Repository,
     Store,
+    Settings,
+    Secure,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -404,3 +408,25 @@ pub struct StoreDef {
 
 /// store自动生成的方法名
 pub const STORE_BUILTINS: [&str; 4] = ["all", "find", "save", "delete"];
+
+/// 简单配置项，带默认值
+#[derive(Clone, Debug, PartialEq)]
+pub struct SettingField {
+    pub name: String,
+    pub ty: Type,
+    pub default: Expr,
+}
+
+/// 简单配置，iOS使用UserDefaults，Android使用DataStore
+#[derive(Clone, Debug, PartialEq)]
+pub struct SettingsDef {
+    pub name: String,
+    pub fields: Vec<SettingField>,
+}
+
+/// 安全凭证，iOS使用Keychain，Android使用Keystore加密，读取结果总是可选的
+#[derive(Clone, Debug, PartialEq)]
+pub struct SecureDef {
+    pub name: String,
+    pub fields: Vec<FieldDef>,
+}

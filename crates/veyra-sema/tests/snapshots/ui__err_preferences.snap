@@ -1,0 +1,59 @@
+---
+source: crates/veyra-sema/tests/ui.rs
+expression: out
+---
+error[V2010]: settings字段`theme`需要默认值
+ --> err_preferences.vey:5:3
+  |
+5 |   theme: String
+  |   ^^^^^
+
+error[V5021]: Date类型的settings字段必须是可选类型
+ --> err_preferences.vey:6:9
+  |
+6 |   last: Date
+  |         ^^^^
+
+error[V5020]: settings字段不能是`Profile`
+ --> err_preferences.vey:7:12
+  |
+7 |   profile: Profile = nil
+  |            ^^^^^^^
+  |
+  = note: 可用的类型：Bool、Int、Double、String、Date、枚举及其可选类型
+
+error[V2002]: nil只能用于可选类型
+ --> err_preferences.vey:7:22
+  |
+7 |   profile: Profile = nil
+  |                      ^^^
+
+error[V2040]: settings字段不支持`@writable`
+ --> err_preferences.vey:8:17
+  |
+8 |   size: Int = 1 @writable
+  |                 ^^^^^^^^^
+
+error[V1002]: `Preferences`与平台SDK中的类型同名
+  --> err_preferences.vey:11:8
+   |
+11 | secure Preferences {
+   |        ^^^^^^^^^^^ 请换一个名称
+   |
+   = note: 生成的Swift或Kotlin代码会直接使用这些平台类型
+
+error[V5022]: secure字段不能是`List<String>`
+  --> err_preferences.vey:16:9
+   |
+16 |   data: List<String>
+   |         ^^^^^^^^^^^^ 可用的类型：String、Int、Double、Bool
+
+error[V3009]: View不能直接访问注入的依赖`options`
+  --> err_preferences.vey:23:10
+   |
+23 |     Text(options)
+   |          ^^^^^^^
+   |
+   = note: 依赖只能在ViewModel中使用，请通过state向View暴露数据
+
+error: 共8个错误，0个警告
