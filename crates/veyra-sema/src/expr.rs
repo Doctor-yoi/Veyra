@@ -31,6 +31,7 @@ pub(crate) struct ScreenInfo {
     pub computed: IndexMap<String, Type>,
     pub actions: IndexMap<String, ActionInfo>,
     pub injects: IndexSet<String>,
+    pub effects: IndexSet<String>,
 }
 
 pub(crate) enum Owner<'s> {
@@ -681,6 +682,14 @@ impl<'a> Checker<'a> {
         let Some(info) = screen.and_then(|s| s.actions.get(name)) else {
             if screen.is_some_and(|s| s.state.contains_key(name) || s.computed.contains_key(name)) {
                 return self.not_action(name_span);
+            }
+            if screen.is_some_and(|s| s.effects.contains(name)) {
+                self.diags.push(
+                    Diagnostic::error("V3033", format!("`{name}`是effect，不能由View触发"))
+                        .with_label(name_span, "")
+                        .with_note("effect由ViewModel通过emit发出，View只能分发action"),
+                );
+                return None;
             }
             self.error("V1010", format!("未定义的action`{name}`"), name_span, "");
             return None;

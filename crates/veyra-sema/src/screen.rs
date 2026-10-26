@@ -33,6 +33,8 @@ impl<'a> Checker<'a> {
         let mut state = Vec::new();
         let mut computed_src = Vec::new();
         let mut actions = Vec::new();
+        let mut effects: Vec<ir::EffectDef> = Vec::new();
+        let mut hooks = Vec::new();
         let mut views = Vec::new();
 
         let mut claim = |c: &mut Self, id: &ast::Ident| -> bool {
@@ -160,8 +162,27 @@ impl<'a> Checker<'a> {
                         });
                     }
                 }
-                ScreenMember::Effects(block) => self.unsupported("effects", block.keyword),
-                ScreenMember::Lifecycle(block) => self.unsupported("lifecycle", block.keyword),
+                ScreenMember::Effects(block) => {
+                    for e in self.prune_decls(&block.items) {
+                        if !claim(self, &e.name) {
+                            continue;
+                        }
+                        if e.is_async || e.throws || e.ret.is_some() {
+                            self.diags.push(
+                                Diagnostic::error("V3032", "effect只声明名称与参数")
+                                    .with_label(e.span, "")
+                                    .with_note("effect由ViewModel发出、由组装层处理，不能有async、throws或返回值"),
+                            );
+                        }
+                        info.effects.insert(e.name.name.clone());
+                        let params = self.params(&e.params);
+                        effects.push(ir::EffectDef {
+                            name: e.name.name.clone(),
+                            params,
+                        });
+                    }
+                }
+                ScreenMember::Lifecycle(block) => hooks.extend(self.prune_decls(&block.items)),
                 ScreenMember::View(block) => views.push(block),
             }
         }
@@ -235,6 +256,31 @@ impl<'a> Checker<'a> {
             .collect();
         self.check_computed_cycles(&computed, &names);
 
+        let mut lifecycle: Vec<ir::LifecycleHook> = Vec::new();
+        for h in hooks {
+            let Some(event) = ir::LifecycleEvent::from_name(&h.event.name) else {
+                self.diags.push(
+                    Diagnostic::error("V3030", format!("未知的生命周期事件`{}`", h.event.name))
+                        .with_label(h.event.span, "")
+                        .with_note("可用的事件：onAppear、onDisappear"),
+                );
+                continue;
+            };
+            if lifecycle.iter().any(|x| x.event == event) {
+                self.error(
+                    "V3031",
+                    format!("生命周期事件`{}`重复", h.event.name),
+                    h.event.span,
+                    "",
+                );
+                continue;
+            }
+            let sc = Scope::new(Owner::Screen(&info), false);
+            if let Some(action) = self.action_ref(&sc, &h.action) {
+                lifecycle.push(ir::LifecycleHook { event, action });
+            }
+        }
+
         let mut view = Vec::new();
         match views.as_slice() {
             [] => self.error(
@@ -261,6 +307,8 @@ impl<'a> Checker<'a> {
             state,
             computed,
             actions,
+            effects,
+            lifecycle,
             view,
         }
     }

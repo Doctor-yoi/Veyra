@@ -161,6 +161,37 @@ pub struct ActionDef {
     pub is_async: bool,
 }
 
+/// ViewModel发出的一次性事件，例如导航
+#[derive(Clone, Debug, PartialEq)]
+pub struct EffectDef {
+    pub name: String,
+    pub params: Vec<ParamDef>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LifecycleEvent {
+    /// 页面出现
+    Appear,
+    /// 页面消失
+    Disappear,
+}
+
+impl LifecycleEvent {
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "onAppear" => Some(Self::Appear),
+            "onDisappear" => Some(Self::Disappear),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct LifecycleHook {
+    pub event: LifecycleEvent,
+    pub action: ActionRef,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScreenDef {
     pub name: String,
@@ -168,10 +199,19 @@ pub struct ScreenDef {
     pub state: Vec<StateField>,
     pub computed: Vec<ComputedField>,
     pub actions: Vec<ActionDef>,
+    pub effects: Vec<EffectDef>,
+    pub lifecycle: Vec<LifecycleHook>,
     pub view: Vec<ViewNode>,
 }
 
 impl ScreenDef {
+    pub fn hook(&self, event: LifecycleEvent) -> Option<&ActionRef> {
+        self.lifecycle
+            .iter()
+            .find(|h| h.event == event)
+            .map(|h| &h.action)
+    }
+
     pub fn writable_fields(&self) -> impl Iterator<Item = &StateField> {
         self.state.iter().filter(|f| f.writable)
     }
