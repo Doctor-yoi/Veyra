@@ -1,0 +1,19 @@
+[package]
+name = "veyra-syntax"
+description = "Veyra语言的词法分析、语法树与解析器"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license-file.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[dependencies]
+veyra-diagnostics.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
+
+[lints]
+workspace = true

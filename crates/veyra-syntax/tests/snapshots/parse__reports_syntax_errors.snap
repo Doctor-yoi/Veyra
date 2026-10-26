@@ -1,0 +1,33 @@
+---
+source: crates/veyra-syntax/tests/parse.rs
+expression: "render(r#\"\nscreen A {\n  state {\n    a: String = \"\n    b: Int = 1\n  }\n  view {\n    Text(\"x\"\n    Button(\"ok\", action: go)\n  }\n  unknown {}\n}\n#if ios\nmodel M { a: Int }\n\"#)"
+---
+error[V0002]: 字符串未闭合
+ --> test.vey:4:17
+  |
+4 |     a: String = "
+  |                 ^ 缺少结尾的`"`
+
+error[V0010]: 期望`)`，实际为`Button`
+ --> test.vey:9:5
+  |
+9 |     Button("ok", action: go)
+  |     ^^^^^^ 此处期望`)`
+
+error[V0015]: 未知的screen成员`unknown`
+  --> test.vey:11:3
+   |
+11 |   unknown {}
+   |   ^^^^^^^
+   |
+   = note: 可用的成员：inject、state、computed、actions、effects、lifecycle、view
+
+error[V0012]: `#if`缺少对应的`#endif`
+  --> test.vey:13:1
+   |
+13 | #if ios
+   | ^^^ 条件块从这里开始
+15 | 
+   | - 在此之前应出现`#endif`
+
+error: 共4个错误，0个警告

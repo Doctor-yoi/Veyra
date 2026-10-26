@@ -1,0 +1,19 @@
+---
+source: crates/veyra-syntax/tests/parse.rs
+expression: "render(\"widget Foo {}\\nenum E { a b }\\n#endif\\n\")"
+---
+error[V0014]: 未知的声明`widget`
+ --> test.vey:1:1
+  |
+1 | widget Foo {}
+  | ^^^^^^
+  |
+  = note: 可用的声明：enum、model、entity、repository、store、settings、secure、component、screen
+
+error[V0013]: 多余的`#endif`
+ --> test.vey:3:1
+  |
+3 | #endif
+  | ^^^^^^ 没有与之匹配的`#if`
+
+error: 共2个错误，0个警告
