@@ -53,6 +53,8 @@ pub struct Program {
     pub enums: Vec<EnumDef>,
     pub models: Vec<ModelDef>,
     pub repositories: Vec<RepositoryDef>,
+    pub entities: Vec<EntityDef>,
+    pub stores: Vec<StoreDef>,
     pub components: Vec<ComponentDef>,
     pub screens: Vec<ScreenDef>,
     /// 本平台用到的全部本地化文案
@@ -60,6 +62,10 @@ pub struct Program {
 }
 
 impl Program {
+    pub fn entity(&self, name: &str) -> Option<&EntityDef> {
+        self.entities.iter().find(|e| e.name == name)
+    }
+
     pub fn model(&self, name: &str) -> Option<&ModelDef> {
         self.models.iter().find(|m| m.name == name)
     }
@@ -138,6 +144,7 @@ pub struct RepositoryDef {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum InjectKind {
     Repository,
+    Store,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -262,3 +269,138 @@ pub struct ComponentDef {
     pub params: Vec<ComponentParam>,
     pub body: Vec<ViewNode>,
 }
+
+/// 持久化实体的字段
+#[derive(Clone, Debug, PartialEq)]
+pub struct EntityField {
+    pub name: String,
+    pub ty: Type,
+    pub primary_key: bool,
+    pub indexed: bool,
+    pub unique: bool,
+}
+
+/// 持久化实体，同名的值类型位于[`Program::models`]
+#[derive(Clone, Debug, PartialEq)]
+pub struct EntityDef {
+    pub name: String,
+    /// 数据库表名
+    pub table: String,
+    pub fields: Vec<EntityField>,
+}
+
+impl EntityDef {
+    pub fn primary_key(&self) -> &EntityField {
+        self.fields
+            .iter()
+            .find(|f| f.primary_key)
+            .unwrap_or(&self.fields[0])
+    }
+}
+
+/// 查询结果的形态
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum QueryResult {
+    /// 持续观察，`Stream<List<T>>`
+    Stream,
+    /// 读取一次，`List<T>`
+    List,
+    /// 读取第一条，`T?`
+    One,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CompareOp {
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+}
+
+impl CompareOp {
+    pub fn symbol(self) -> &'static str {
+        match self {
+            CompareOp::Eq => "==",
+            CompareOp::Ne => "!=",
+            CompareOp::Lt => "<",
+            CompareOp::Le => "<=",
+            CompareOp::Gt => ">",
+            CompareOp::Ge => ">=",
+        }
+    }
+
+    /// 交换左右操作数后的运算符
+    pub fn flip(self) -> Self {
+        match self {
+            CompareOp::Lt => CompareOp::Gt,
+            CompareOp::Le => CompareOp::Ge,
+            CompareOp::Gt => CompareOp::Lt,
+            CompareOp::Ge => CompareOp::Le,
+            other => other,
+        }
+    }
+}
+
+/// 谓词中的值
+#[derive(Clone, Debug, PartialEq)]
+pub enum Operand {
+    /// 查询参数
+    Param(String),
+    /// 字面量或枚举成员
+    Literal(Expr),
+}
+
+/// 查询条件，左侧总是实体字段
+#[derive(Clone, Debug, PartialEq)]
+pub enum Predicate {
+    Compare {
+        field: String,
+        op: CompareOp,
+        value: Operand,
+    },
+    Contains {
+        field: String,
+        value: Operand,
+    },
+    IsNil {
+        field: String,
+        negated: bool,
+    },
+    /// 布尔字段本身作为条件
+    Flag {
+        field: String,
+        value: bool,
+    },
+    And(Box<Predicate>, Box<Predicate>),
+    Or(Box<Predicate>, Box<Predicate>),
+    Not(Box<Predicate>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct OrderKey {
+    pub field: String,
+    pub descending: bool,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct QueryDef {
+    pub name: String,
+    pub params: Vec<ParamDef>,
+    pub result: QueryResult,
+    pub filter: Option<Predicate>,
+    pub order: Vec<OrderKey>,
+    pub limit: Option<i64>,
+}
+
+/// 实体的数据访问对象，自动提供`all`、`find`、`save`与`delete`
+#[derive(Clone, Debug, PartialEq)]
+pub struct StoreDef {
+    pub name: String,
+    pub entity: String,
+    pub queries: Vec<QueryDef>,
+}
+
+/// store自动生成的方法名
+pub const STORE_BUILTINS: [&str; 4] = ["all", "find", "save", "delete"];
