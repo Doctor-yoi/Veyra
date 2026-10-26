@@ -1,0 +1,41 @@
+---
+source: crates/veyra-sema/tests/ui.rs
+expression: out
+---
+error[V3001]: state`isLoading`是只读的，不能绑定
+  --> err_binding.vey:13:34
+   |
+13 |       TextField("姓名", text: bind(isLoading))
+   |                                    ^^^^^^^^^
+ 5 |     isLoading: Bool = false
+   |     --------- 在这里添加@writable
+   |
+   = note: 只有标记@writable的state才会生成setter并允许View写入
+
+error[V2001]: 类型不匹配：期望`String`，实际为`Int`
+  --> err_binding.vey:14:34
+   |
+14 |       TextField("年龄", text: bind(age))
+   |                                    ^^^ 类型为`Int`
+
+error[V3002]: computed`upper`是只读的，不能绑定
+  --> err_binding.vey:15:34
+   |
+15 |       TextField("大写", text: bind(upper))
+   |                                    ^^^^^
+
+error[V3017]: 双向绑定需要写成bind(...)
+  --> err_binding.vey:16:29
+   |
+16 |       TextField("姓名", text: name)
+   |                               ^^^^
+   |
+   = note: 改为`bind(name)`
+
+error[V1010]: 未定义的state`missing`
+  --> err_binding.vey:17:31
+   |
+17 |       Toggle("加载", isOn: bind(missing))
+   |                                 ^^^^^^^
+
+error: 共5个错误，0个警告

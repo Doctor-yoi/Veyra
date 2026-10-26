@@ -1,0 +1,35 @@
+// 条件编译
+#if debug
+model Debug { a: Int }
+#endif
+
+#if premium || unknown_flag
+model Pro { a: Int }
+#endif
+
+screen Settings {
+  state {
+    #if ios
+    faceId: Bool = false @writable
+    #elseif android
+    fingerprint: Bool = false @writable
+    #endif
+  }
+  view {
+    Column {
+      #if ios
+      Toggle("面容", isOn: bind(faceId))
+      #else
+      Toggle("指纹", isOn: bind(fingerprint))
+      #endif
+      Toggle("面容", isOn: bind(faceId))
+    }
+  }
+}
+
+screen Empty {
+  state {
+    a: Int = 0
+    a: Int = 1
+  }
+}

@@ -1,0 +1,5 @@
+---
+source: crates/veyra-sema/tests/ui.rs
+expression: out
+---
+无诊断

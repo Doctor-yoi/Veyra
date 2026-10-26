@@ -1,0 +1,151 @@
+---
+source: crates/veyra-sema/tests/ui.rs
+expression: out
+---
+error[V2012]: 模型`Node`直接包含了自身
+ --> err_types.vey:4:7
+  |
+4 | model Node {
+  |       ^^^^
+  |
+  = note: 值类型不能递归包含自身，可以改用List字段
+
+error[V2010]: state`count`需要默认值
+  --> err_types.vey:20:5
+   |
+20 |     count: Int
+   |     ^^^^^ 非可选类型必须提供默认值
+
+error[V2005]: Stream只能作为repository方法的返回类型
+  --> err_types.vey:21:13
+   |
+21 |     stream: Stream<Int> = 0
+   |             ^^^^^^^^^^^
+   |
+   = note: ViewModel负责订阅Stream并写入state，View只读取state
+
+error[V2001]: 类型不匹配：期望`Stream<Int>`，实际为`Int`
+  --> err_types.vey:21:27
+   |
+21 |     stream: Stream<Int> = 0
+   |                           ^ 类型为`Int`
+
+error[V1013]: 枚举`Kind`没有成员`c`
+  --> err_types.vey:22:21
+   |
+22 |     picked: Kind = .c
+   |                     ^
+
+error[V2011]: 默认值必须是常量
+  --> err_types.vey:23:21
+   |
+23 |     label: String = items.count
+   |                     ^^^^^
+   |
+   = note: 可以使用字面量、列表字面量、枚举成员与nil
+
+error[V3007]: computed`a`存在循环依赖
+  --> err_types.vey:27:5
+   |
+27 |     a: Int = b + 1
+   |     ^
+
+error[V3007]: computed`b`存在循环依赖
+  --> err_types.vey:28:5
+   |
+28 |     b: Int = a
+   |     ^
+
+error[V2024]: Int与Double不能直接运算
+  --> err_types.vey:29:21
+   |
+29 |     mixed: Double = total + count
+   |                     ^^^^^^^^^^^^^
+   |
+   = note: 请统一字段类型，或在ViewModel中计算后放入state
+
+error[V2021]: 不能直接访问可选值`Item?`的成员
+  --> err_types.vey:30:17
+   |
+30 |     bad: Bool = selected.price > 0
+   |                 ^^^^^^^^^^^^^^
+   |
+   = note: 请先用`??`提供默认值
+
+error[V2001]: 类型不匹配：期望`Double`，实际为`String`
+  --> err_types.vey:33:21
+   |
+33 |     Column(spacing: "16") {
+   |                     ^^^^ 类型为`String`
+
+error[V2001]: 类型不匹配：期望`String`，实际为`Double`
+  --> err_types.vey:34:12
+   |
+34 |       Text(total)
+   |            ^^^^^ 类型为`Double`
+
+error[V2021]: 不能直接访问可选值`Item?`的成员
+  --> err_types.vey:35:12
+   |
+35 |       Text(selected.id)
+   |            ^^^^^^^^^^^
+   |
+   = note: 请先用`??`提供默认值
+
+error[V2037]: `Item`没有字段`name`
+  --> err_types.vey:36:24
+   |
+36 |       List(items, key: .name) { item in
+   |                        ^^^^^
+
+error[V2025]: `Item`没有字段`title`
+  --> err_types.vey:37:19
+   |
+37 |         Text(item.title)
+   |                   ^^^^^
+
+error[V2039]: 组件`ForEach`的闭包需要一个元素参数
+  --> err_types.vey:39:32
+   |
+39 |       ForEach(items, key: .id) {
+   |                                ^ 例如`{ course in ... }`
+
+error[V2042]: `.font`不能用于`Spacer`
+  --> err_types.vey:42:16
+   |
+42 |       Spacer().font(.title)
+   |                ^^^^
+   |
+   = note: 可用于：Text
+
+error[V2044]: 无效的取值
+  --> err_types.vey:43:22
+   |
+43 |       Text("x").font(.huge).blur(3)
+   |                      ^^^^^
+   |
+   = note: 可用取值：.largeTitle、.title、.title2、.title3、.headline、.subheadline、.body、.callout、.footnote、.caption
+
+error[V1012]: 未知的修饰符`.blur`
+  --> err_types.vey:43:29
+   |
+43 |       Text("x").font(.huge).blur(3)
+   |                             ^^^^
+   |
+   = note: 内置修饰符：padding、font、foreground、background、frame、disabled、hidden、onTap、accessibilityLabel
+
+error[V1011]: 未知的组件`Unknown`
+  --> err_types.vey:44:7
+   |
+44 |       Unknown()
+   |       ^^^^^^^
+   |
+   = note: 内置组件：Column、Row、Stack、ScrollView、Text、Button、TextField、SecureField、Toggle、Slider、Image、Spacer、Divider、Progress、List、ForEach
+
+error[V2034]: 组件`Spacer`不接受子组件
+  --> err_types.vey:45:16
+   |
+45 |       Spacer() { Text("x") }
+   |                ^^^^^^^^^^^^^
+
+error: 共21个错误，0个警告

@@ -1,0 +1,75 @@
+---
+source: crates/veyra-sema/tests/ui.rs
+expression: out
+---
+[ios]
+error[V6002]: `debug`条件只能用于view与修饰符
+ --> err_cfg.vey:2:1
+  |
+2 | #if debug
+  | ^^^
+  |
+  = note: 声明在调试与发布构建中必须一致，平台与自定义flag不受此限制
+
+error[V6001]: 未声明的条件`unknown_flag`
+ --> err_cfg.vey:6:16
+  |
+6 | #if premium || unknown_flag
+  |                ^^^^^^^^^^^^
+  |
+  = note: 可用的条件：ios、android、harmony、debug，以及veyra.toml中[flags]声明的名称
+
+error[V3020]: screen`Empty`缺少view
+  --> err_cfg.vey:30:8
+   |
+30 | screen Empty {
+   |        ^^^^^
+
+error[V1003]: screen成员`a`重复
+  --> err_cfg.vey:33:5
+   |
+33 |     a: Int = 1
+   |     ^
+32 |     a: Int = 0
+   |     - 首次声明于此
+
+error: 共4个错误，0个警告
+
+[android]
+error[V6002]: `debug`条件只能用于view与修饰符
+ --> err_cfg.vey:2:1
+  |
+2 | #if debug
+  | ^^^
+  |
+  = note: 声明在调试与发布构建中必须一致，平台与自定义flag不受此限制
+
+error[V6001]: 未声明的条件`unknown_flag`
+ --> err_cfg.vey:6:16
+  |
+6 | #if premium || unknown_flag
+  |                ^^^^^^^^^^^^
+  |
+  = note: 可用的条件：ios、android、harmony、debug，以及veyra.toml中[flags]声明的名称
+
+error[V1010]: 未定义的state`faceId`
+  --> err_cfg.vey:25:31
+   |
+25 |       Toggle("面容", isOn: bind(faceId))
+   |                                 ^^^^^^
+
+error[V3020]: screen`Empty`缺少view
+  --> err_cfg.vey:30:8
+   |
+30 | screen Empty {
+   |        ^^^^^
+
+error[V1003]: screen成员`a`重复
+  --> err_cfg.vey:33:5
+   |
+33 |     a: Int = 1
+   |     ^
+32 |     a: Int = 0
+   |     - 首次声明于此
+
+error: 共5个错误，0个警告

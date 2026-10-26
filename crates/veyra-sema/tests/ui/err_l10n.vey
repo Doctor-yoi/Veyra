@@ -1,0 +1,21 @@
+// 本地化规则
+screen Home {
+  state {
+    name: String = ""
+    price: Double = 0
+  }
+  computed {
+    greeting: String = loc("home.greeting", "你好")
+  }
+  view {
+    Column {
+      Text(loc("home.title", "首页"))
+      Text(loc("home.title", "主页"))
+      Text(loc("Home-Bad", "x"))
+      Text(loc("home.welcome", "欢迎{name}", user: name))
+      Text(loc("home.price", "价格{price}", price: price))
+      Text(loc("home.broken", "坏{掉"))
+      Text(loc(name, "x"))
+    }
+  }
+}

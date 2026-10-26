@@ -1,0 +1,20 @@
+// 双向绑定规则
+screen Login {
+  state {
+    name: String = "" @writable
+    isLoading: Bool = false
+    age: Int = 0 @writable
+  }
+  computed {
+    upper: String = name
+  }
+  view {
+    Column {
+      TextField("姓名", text: bind(isLoading))
+      TextField("年龄", text: bind(age))
+      TextField("大写", text: bind(upper))
+      TextField("姓名", text: name)
+      Toggle("加载", isOn: bind(missing))
+    }
+  }
+}

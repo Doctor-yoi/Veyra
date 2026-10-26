@@ -1,0 +1,77 @@
+---
+source: crates/veyra-sema/tests/ui.rs
+expression: out
+---
+error[V3006]: action`setCount`与state`count`的setter重名
+  --> err_actions.vey:10:5
+   |
+10 |     count: Int = 0 @writable
+   |     ^^^^^
+   |
+   = note: @writable字段会自动生成同名setter
+
+error[V3018]: action不能有返回值
+  --> err_actions.vey:16:16
+   |
+16 |     fetch() -> Int
+   |                ^^^
+   |
+   = note: action的结果应写入state
+
+error[V3004]: `reload`是action，不能作为值使用
+  --> err_actions.vey:20:12
+   |
+20 |       Text(reload)
+   |            ^^^^^^
+   |
+   = note: action只能出现在action参数、onTap与lifecycle中
+
+error[V3009]: View不能直接访问注入的依赖`users`
+  --> err_actions.vey:21:12
+   |
+21 |       Text(users)
+   |            ^^^^^
+   |
+   = note: 依赖只能在ViewModel中使用，请通过state向View暴露数据
+
+error[V3015]: action`save`需要参数(id: String, force: Bool)
+  --> err_actions.vey:22:28
+   |
+22 |       Button("保存", action: save)
+   |                              ^^^^
+
+error[V2001]: 类型不匹配：期望`String`，实际为`Int`
+  --> err_actions.vey:23:33
+   |
+23 |       Button("保存", action: save(1, force: true))
+   |                                   ^ 类型为`Int`
+
+error[V2036]: 缺少参数`force`
+  --> err_actions.vey:24:28
+   |
+24 |       Button("保存", action: save("a", wrong: true))
+   |                              ^^^^^^^^^^^^^^^^^^^^^^
+
+error[V2030]: action`save`没有参数`wrong`
+  --> err_actions.vey:24:38
+   |
+24 |       Button("保存", action: save("a", wrong: true))
+   |                                        ^^^^^
+
+error[V3011]: 此处需要action
+  --> err_actions.vey:25:28
+   |
+25 |       Button("刷新", action: title)
+   |                              ^^^^^
+   |
+   = note: 例如`refresh`或`openCourse(course.id)`
+
+error[V3005]: View中只能调用内置函数
+  --> err_actions.vey:26:12
+   |
+26 |       Text(String(count))
+   |            ^^^^^^
+   |
+   = note: 可用的函数：loc、plural、format；有副作用的操作请放进action
+
+error: 共10个错误，0个警告

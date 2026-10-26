@@ -1,0 +1,30 @@
+// 命令分发规则
+repository UserRepository {
+  load() async -> String
+}
+
+screen Profile {
+  inject users: UserRepository
+  state {
+    title: String = ""
+    count: Int = 0 @writable
+  }
+  actions {
+    save(id: String, force: Bool)
+    reload() async
+    setCount(value: Int)
+    fetch() -> Int
+  }
+  view {
+    Column {
+      Text(reload)
+      Text(users)
+      Button("保存", action: save)
+      Button("保存", action: save(1, force: true))
+      Button("保存", action: save("a", wrong: true))
+      Button("刷新", action: title)
+      Text(String(count))
+      Button("刷新", action: reload).onTap(reload())
+    }
+  }
+}

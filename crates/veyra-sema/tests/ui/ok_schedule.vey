@@ -1,0 +1,64 @@
+// 完整的合法示例
+enum CourseKind { lecture, lab }
+
+model Course {
+  id: String
+  name: String
+  credits: Double
+  kind: CourseKind
+  teacher: String?
+}
+
+repository CourseRepository {
+  getCourses() async throws -> List<Course>
+  observeCourses() -> Stream<List<Course>>
+}
+
+screen Schedule {
+  inject courses: CourseRepository
+
+  state {
+    query: String = "" @writable
+    items: List<Course> = []
+    isRefreshing: Bool = false
+    filter: CourseKind = .lecture @writable
+    #if ios
+    useFaceID: Bool = false @writable
+    #endif
+  }
+
+  computed {
+    count: Int = items.count
+    canRefresh: Bool = !isRefreshing && count >= 0
+    title: String = query.isEmpty ? "" : query
+  }
+
+  actions {
+    refresh() async
+    openCourse(id: String)
+  }
+
+  view {
+    Column(spacing: 16, alignment: .leading) {
+      Text(loc("schedule.title", "我的课表")).font(.title).padding(8)
+      Text(loc("schedule.count", "共{count}门课程", count: count))
+      TextField(loc("schedule.search", "搜索"), text: bind(query))
+      #if ios
+      Toggle(loc("schedule.faceid", "面容ID"), isOn: bind(useFaceID))
+      #endif
+      Button(loc("schedule.refresh", "刷新"), action: refresh).disabled(!canRefresh)
+      if items.isEmpty {
+        Text(loc("schedule.empty", "暂无课程")).foreground(.secondary)
+      } else {
+        List(items, key: .id) { course in
+          Row {
+            Text(course.name)
+            Spacer()
+            Text(course.teacher ?? "-")
+          }
+          .onTap(openCourse(course.id))
+        }
+      }
+    }
+  }
+}

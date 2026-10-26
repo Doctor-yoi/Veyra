@@ -1,0 +1,63 @@
+---
+source: crates/veyra-sema/tests/ui.rs
+expression: out
+---
+error[V4005]: loc只能在view中使用
+ --> err_l10n.vey:8:24
+  |
+8 |     greeting: String = loc("home.greeting", "你好")
+  |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: ViewModel中的state保存原始数据，文案在View中组装
+
+error[V4001]: 本地化key`home.title`的定义不一致
+  --> err_l10n.vey:13:16
+   |
+13 |       Text(loc("home.title", "主页"))
+   |                ^^^^^^^^^^^^ 这里的文案或参数不同
+12 |       Text(loc("home.title", "首页"))
+   |                ------------ 首次定义于此
+   |
+   = note: 同一个key在所有位置必须使用相同的源文案与参数
+
+error[V4002]: 无效的本地化key`Home-Bad`
+  --> err_l10n.vey:14:16
+   |
+14 |       Text(loc("Home-Bad", "x"))
+   |                ^^^^^^^^^^
+   |
+   = note: key由小写字母、数字与下划线组成，用`.`分段，例如`schedule.title`
+
+error[V4006]: 缺少占位符`{name}`对应的参数
+  --> err_l10n.vey:15:32
+   |
+15 |       Text(loc("home.welcome", "欢迎{name}", user: name))
+   |                                ^^^^^^^^^^^^
+
+error[V4007]: 文案中没有占位符`{user}`
+  --> err_l10n.vey:15:44
+   |
+15 |       Text(loc("home.welcome", "欢迎{name}", user: name))
+   |                                              ^^^^
+
+error[V4003]: 文案参数只能是String或Int，实际为`Double`
+  --> err_l10n.vey:16:50
+   |
+16 |       Text(loc("home.price", "价格{price}", price: price))
+   |                                                    ^^^^^
+   |
+   = note: 其他类型请先用format()格式化为String
+
+error[V4004]: 占位符中不能包含`掉`
+  --> err_l10n.vey:17:31
+   |
+17 |       Text(loc("home.broken", "坏{掉"))
+   |                               ^^^^^^^
+
+error[V4002]: loc的第1个参数必须是字符串字面量的key
+  --> err_l10n.vey:18:12
+   |
+18 |       Text(loc(name, "x"))
+   |            ^^^^^^^^^^^^^^
+
+error: 共8个错误，0个警告

@@ -1,0 +1,22 @@
+[package]
+name = "veyra-sema"
+description = "Veyra语义检查：条件裁剪、名称解析、类型检查与MVVM规则"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license-file.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[dependencies]
+indexmap.workspace = true
+veyra-diagnostics.workspace = true
+veyra-ir.workspace = true
+veyra-syntax.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
+
+[lints]
+workspace = true

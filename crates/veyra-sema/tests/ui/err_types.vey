@@ -1,0 +1,48 @@
+// 类型与默认值
+enum Kind { a, b }
+
+model Node {
+  value: Int
+  next: Node?
+  children: List<Node>
+}
+
+model Item {
+  id: String
+  price: Double
+  kind: Kind
+}
+
+screen Shop {
+  state {
+    items: List<Item> = []
+    total: Double = 0
+    count: Int
+    stream: Stream<Int> = 0
+    picked: Kind = .c
+    label: String = items.count
+    selected: Item?
+  }
+  computed {
+    a: Int = b + 1
+    b: Int = a
+    mixed: Double = total + count
+    bad: Bool = selected.price > 0
+  }
+  view {
+    Column(spacing: "16") {
+      Text(total)
+      Text(selected.id)
+      List(items, key: .name) { item in
+        Text(item.title)
+      }
+      ForEach(items, key: .id) {
+        Text("x")
+      }
+      Spacer().font(.title)
+      Text("x").font(.huge).blur(3)
+      Unknown()
+      Spacer() { Text("x") }
+    }
+  }
+}
