@@ -26,7 +26,7 @@ use indexmap::IndexMap;
 use veyra_diagnostics::{Diagnostic, Diagnostics, Span};
 use veyra_ir::{
     ComponentParam, EntityDef, EnumDef, LocString, ModelDef, Platform, Program, RepositoryDef,
-    StoreDef,
+    SecureDef, SettingsDef, StoreDef,
 };
 use veyra_syntax::ast;
 
@@ -76,7 +76,8 @@ pub(crate) enum Global<'a> {
     Component(&'a ast::ComponentDecl),
     Entity(&'a ast::EntityDecl),
     Store(&'a ast::StoreDecl),
-    Unsupported,
+    Settings(&'a ast::FieldsDecl),
+    Secure(&'a ast::FieldsDecl),
 }
 
 pub(crate) struct Checker<'a> {
@@ -88,6 +89,8 @@ pub(crate) struct Checker<'a> {
     pub repositories: IndexMap<String, RepositoryDef>,
     pub entities: IndexMap<String, EntityDef>,
     pub stores: IndexMap<String, StoreDef>,
+    pub settings: IndexMap<String, SettingsDef>,
+    pub secures: IndexMap<String, SecureDef>,
     /// 组件签名
     pub components: IndexMap<String, Vec<ComponentParam>>,
     pub strings: IndexMap<String, (LocString, Span)>,
@@ -104,6 +107,8 @@ impl<'a> Checker<'a> {
             repositories: IndexMap::new(),
             entities: IndexMap::new(),
             stores: IndexMap::new(),
+            settings: IndexMap::new(),
+            secures: IndexMap::new(),
             components: IndexMap::new(),
             strings: IndexMap::new(),
         }
@@ -160,6 +165,8 @@ impl<'a> Checker<'a> {
             repositories: self.repositories.values().cloned().collect(),
             entities: self.entities.values().cloned().collect(),
             stores: self.stores.values().cloned().collect(),
+            settings: self.settings.values().cloned().collect(),
+            secures: self.secures.values().cloned().collect(),
             components,
             screens,
             strings,
@@ -176,10 +183,8 @@ impl<'a> Checker<'a> {
             ast::Item::Component(d) => Global::Component(d),
             ast::Item::Entity(d) => Global::Entity(d),
             ast::Item::Store(d) => Global::Store(d),
-            _ => {
-                self.unsupported(&format!("`{}`声明", item.keyword()), name.span);
-                Global::Unsupported
-            }
+            ast::Item::Settings(d) => Global::Settings(d),
+            ast::Item::Secure(d) => Global::Secure(d),
         };
         if is_builtin_type(&name.name) {
             self.error(
@@ -244,7 +249,9 @@ const PLATFORM_TYPES: &[&str] = &[
     "Column",
     "Composable",
     "Container",
+    "Context",
     "Data",
+    "DataStore",
     "Dictionary",
     "Divider",
     "Environment",
@@ -263,6 +270,7 @@ const PLATFORM_TYPES: &[&str] = &[
     "Observable",
     "Optional",
     "Pair",
+    "Preferences",
     "Result",
     "Row",
     "Schema",

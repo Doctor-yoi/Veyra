@@ -9,6 +9,8 @@ import SwiftUI
 /// Dependencies provided by the app and passed to view models by the root views
 @MainActor
 protocol VeyraDependencies: Sendable {
+    var account: any Account { get }
+    var todoPreferences: any TodoPreferences { get }
     var todoStore: any TodoStore { get }
 }
 

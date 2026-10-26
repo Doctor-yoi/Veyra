@@ -1,14 +1,34 @@
-// 设置页
+// 设置页：偏好设置与登录凭证
+
+settings AppPreferences {
+  reminder: Bool = true
+  volume: Double = 0.6
+  nickname: String = ""
+}
+
+secure Account {
+  token: String
+}
 
 screen Settings {
+  inject preferences: AppPreferences
+  inject account: Account
+
   state {
     reminder: Bool = true @writable
     volume: Double = 0.6 @writable
     nickname: String = "" @writable
+    signedIn: Bool = false
   }
 
   actions {
+    load() async
     save() async
+    signOut() async
+  }
+
+  lifecycle {
+    onAppear: load
   }
 
   view {
@@ -19,6 +39,9 @@ screen Settings {
       TextField(loc("settings.nickname", "昵称"), text: bind(nickname))
       Button(loc("settings.save", "保存"), action: save)
         .frame(maxWidth: .infinity)
+      if signedIn {
+        Button(loc("settings.sign_out", "退出登录"), action: signOut)
+      }
     }
     .padding()
   }

@@ -11,6 +11,8 @@ import kotlinx.coroutines.launch
 
 class TodosViewModel(
     private val todos: TodoStore,
+    private val preferences: TodoPreferences,
+    private val account: Account,
 ) : TodosViewModelBase() {
     override fun load() {
         viewModelScope.launch {

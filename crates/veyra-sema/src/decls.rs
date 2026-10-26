@@ -73,6 +73,13 @@ impl<'a> Checker<'a> {
                 self.check_store(d);
             }
         }
+        for g in &globals {
+            match g {
+                Global::Settings(d) => self.check_settings(d),
+                Global::Secure(d) => self.check_secure(d),
+                _ => {}
+            }
+        }
     }
 
     fn check_enum(&mut self, d: &'a ast::EnumDecl) {

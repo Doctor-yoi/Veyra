@@ -1,0 +1,25 @@
+// settings与secure
+model Profile { name: String }
+
+settings Options {
+  theme: String
+  last: Date
+  profile: Profile = nil
+  size: Int = 1 @writable
+}
+
+secure Preferences {
+  token: String = ""
+}
+
+secure Vault {
+  data: List<String>
+}
+
+screen Home {
+  inject options: Options
+  inject vault: Vault
+  view {
+    Text(options)
+  }
+}

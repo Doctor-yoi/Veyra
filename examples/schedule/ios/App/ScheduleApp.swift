@@ -27,6 +27,9 @@ final class AppDependencies: VeyraDependencies {
     let stores: VeyraStores
     let courseRepository: any CourseRepository = InMemoryCourseRepository()
 
+    let appPreferences: any AppPreferences = UserDefaultsAppPreferences()
+    let account: any Account = KeychainAccount()
+
     var noteStore: any NoteStore { stores.noteStore }
 
     init() {

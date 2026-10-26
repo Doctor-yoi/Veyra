@@ -15,6 +15,7 @@
 //! 本地化文案生成到`res/values*/veyra_strings.xml`
 
 mod kotlin;
+mod preferences;
 mod resources;
 mod screen;
 mod storage;
@@ -175,6 +176,33 @@ impl Backend for ComposeBackend {
             files.push(OutputFile::user_owned(
                 user_dir.join("VeyraMigrations.kt"),
                 storage::migrations(&options),
+            ));
+        }
+        for st in &program.settings {
+            files.push(OutputFile::generated(
+                file(&st.name),
+                preferences::settings(st, &options),
+            ));
+        }
+        for st in &program.secures {
+            files.push(OutputFile::generated(
+                file(&st.name),
+                preferences::secure(st, &options),
+            ));
+        }
+        if !program.secures.is_empty() {
+            files.push(OutputFile::generated(
+                file("VeyraVault"),
+                preferences::vault(&options),
+            ));
+        }
+        let local = !program.entities.is_empty()
+            || !program.settings.is_empty()
+            || !program.secures.is_empty();
+        if options.di == Di::Hilt && local {
+            files.push(OutputFile::generated(
+                file("VeyraLocalModule"),
+                storage::hilt_module(program, &options),
             ));
         }
         if !program.components.is_empty() {

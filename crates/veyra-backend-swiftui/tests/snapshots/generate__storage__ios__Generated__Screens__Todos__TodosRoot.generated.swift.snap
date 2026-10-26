@@ -21,7 +21,7 @@ struct TodosRoot: View {
                     assertionFailure("VeyraDependencies is missing, call veyraDependencies(_:) on an ancestor view")
                     return
                 }
-                viewModel = TodosViewModel(todos: dependencies.todoStore)
+                viewModel = TodosViewModel(todos: dependencies.todoStore, preferences: dependencies.todoPreferences, account: dependencies.account)
             }
         }
     }
