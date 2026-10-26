@@ -5,7 +5,7 @@
 "schedule.compact" = "Compact"
 
 # 共{count}门课程
-"schedule.count" = "{count} courses"
+"schedule.count" = { one = "{count} course", other = "{count} courses" }
 
 # 暂无课程
 "schedule.empty" = "No courses yet"
@@ -30,3 +30,12 @@
 
 # 设置
 "settings.title" = "Settings"
+
+# 添加
+"notes.add" = "Add"
+
+# 写点什么
+"notes.draft" = "Write something"
+
+# 退出登录
+"settings.sign_out" = "Sign out"

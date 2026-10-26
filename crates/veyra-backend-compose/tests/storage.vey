@@ -1,0 +1,78 @@
+enum Priority { low, normal, high }
+
+entity Todo @persistent {
+  id: String @primaryKey
+  title: String
+  note: String?
+  done: Bool
+  priority: Priority
+  dueAt: Date @indexed
+  estimate: Double
+}
+
+store TodoStore for Todo {
+  query pending() -> Stream<List<Todo>> {
+    where !done
+    orderBy dueAt asc, title asc
+  }
+
+  query search(text: String, minimum: Priority) -> Stream<List<Todo>> {
+    where title.contains(text) && priority == minimum || note != nil
+    limit 20
+  }
+
+  query urgent(before: Date) -> List<Todo> {
+    where dueAt < before && priority == .high && estimate >= 1
+    orderBy dueAt desc
+  }
+
+  query byTitle(name: String) -> Todo? {
+    where title == name
+  }
+}
+
+settings TodoPreferences {
+  showDone: Bool = true
+  sortKey: String = "dueAt"
+  limit: Int = 50
+  ratio: Double = 0.5
+  defaultPriority: Priority = .normal
+  lastSync: Date?
+  nickname: String? = nil
+}
+
+secure Account {
+  token: String
+  userId: Int
+  remember: Bool
+}
+
+screen Todos {
+  inject todos: TodoStore
+  inject preferences: TodoPreferences
+  inject account: Account
+
+  state {
+    items: List<Todo> = []
+  }
+
+  actions {
+    load() async
+    toggle(id: String) async
+  }
+
+  lifecycle {
+    onAppear: load
+  }
+
+  view {
+    List(items, key: .id) { task in
+      Row {
+        Text(task.title)
+        Spacer()
+        Text(task.done ? "✓" : "")
+      }
+      .onTap(toggle(task.id))
+    }
+  }
+}

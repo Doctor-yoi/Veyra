@@ -15,17 +15,33 @@
 
 mod catalog;
 mod cfg;
+mod component;
 mod decls;
 mod expr;
 mod screen;
+mod storage;
 mod view;
 
 use indexmap::IndexMap;
-use veyra_diagnostics::{Diagnostic, Diagnostics, Span};
-use veyra_ir::{EnumDef, LocString, ModelDef, Platform, Program, RepositoryDef};
+use std::collections::{HashMap, HashSet};
+
+use veyra_diagnostics::{Diagnostic, Diagnostics, FileId, Span};
+use veyra_ir::{
+    ComponentParam, EntityDef, EnumDef, LocString, ModelDef, Platform, Program, RepositoryDef,
+    SecureDef, SettingsDef, StoreDef,
+};
 use veyra_syntax::ast;
 
 use crate::cfg::Cfg;
+
+/// native代码块的检查级别
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum NativeLint {
+    Allow,
+    #[default]
+    Warn,
+    Deny,
+}
 
 /// 一次检查的目标
 #[derive(Clone, Debug)]
@@ -33,6 +49,7 @@ pub struct Target {
     pub platform: Platform,
     /// veyra.toml中声明的自定义flag及取值
     pub flags: IndexMap<String, bool>,
+    pub native: NativeLint,
 }
 
 impl Target {
@@ -40,6 +57,7 @@ impl Target {
         Self {
             platform,
             flags: IndexMap::new(),
+            native: NativeLint::Warn,
         }
     }
 }
@@ -49,6 +67,8 @@ impl Target {
 pub struct Analysis {
     pub program: Program,
     pub diagnostics: Diagnostics,
+    /// 实际用到的import，用于在全部平台检查完后报告未使用的import
+    pub used_imports: HashSet<(FileId, FileId)>,
 }
 
 /// 对一组源文件执行语义检查
@@ -58,6 +78,7 @@ pub fn analyze(files: &[ast::File], target: &Target) -> Analysis {
     Analysis {
         program,
         diagnostics: checker.diags.sorted(),
+        used_imports: checker.used_imports,
     }
 }
 
@@ -68,29 +89,57 @@ pub(crate) enum Global<'a> {
     Model(&'a ast::ModelDecl),
     Repository(&'a ast::RepositoryDecl),
     Screen(&'a ast::ScreenDecl),
-    Unsupported,
+    Component(&'a ast::ComponentDecl),
+    Entity(&'a ast::EntityDecl),
+    Store(&'a ast::StoreDecl),
+    Settings(&'a ast::FieldsDecl),
+    Secure(&'a ast::FieldsDecl),
 }
 
 pub(crate) struct Checker<'a> {
+    pub target: &'a Target,
     pub cfg: Cfg<'a>,
     pub diags: Diagnostics,
     pub globals: IndexMap<String, (Global<'a>, Span)>,
     pub enums: IndexMap<String, EnumDef>,
     pub models: IndexMap<String, ModelDef>,
     pub repositories: IndexMap<String, RepositoryDef>,
+    pub entities: IndexMap<String, EntityDef>,
+    pub stores: IndexMap<String, StoreDef>,
+    pub settings: IndexMap<String, SettingsDef>,
+    pub secures: IndexMap<String, SecureDef>,
+    /// 组件签名
+    pub components: IndexMap<String, Vec<ComponentParam>>,
     pub strings: IndexMap<String, (LocString, Span)>,
+    /// 正在检查的声明所在的文件
+    pub current: FileId,
+    /// 每个文件可见的其他文件，即直接import的文件
+    pub visible: HashMap<FileId, HashSet<FileId>>,
+    pub paths: HashMap<FileId, String>,
+    /// 实际用到的import，键为(导入方, 被导入方)
+    pub used_imports: HashSet<(FileId, FileId)>,
 }
 
 impl<'a> Checker<'a> {
     fn new(target: &'a Target) -> Self {
         Self {
+            target,
             cfg: Cfg::new(target),
             diags: Diagnostics::new(),
             globals: IndexMap::new(),
             enums: IndexMap::new(),
             models: IndexMap::new(),
             repositories: IndexMap::new(),
+            entities: IndexMap::new(),
+            stores: IndexMap::new(),
+            settings: IndexMap::new(),
+            secures: IndexMap::new(),
+            components: IndexMap::new(),
             strings: IndexMap::new(),
+            current: FileId::default(),
+            visible: HashMap::new(),
+            paths: HashMap::new(),
+            used_imports: HashSet::new(),
         }
     }
 
@@ -103,10 +152,6 @@ impl<'a> Checker<'a> {
     ) {
         self.diags
             .push(Diagnostic::error(code, message).with_label(span, label));
-    }
-
-    pub fn unsupported(&mut self, what: &str, span: Span) {
-        self.error("V9000", format!("{what}尚未支持"), span, "");
     }
 
     /// 声明层级不允许保留`debug`条件
@@ -129,11 +174,23 @@ impl<'a> Checker<'a> {
 
     fn run(&mut self, files: &'a [ast::File]) -> Program {
         for file in files {
+            let set = file
+                .imports
+                .iter()
+                .filter_map(|i| i.resolved)
+                .filter(|f| *f != file.id)
+                .collect();
+            self.visible.insert(file.id, set);
+            self.paths.insert(file.id, file.path.clone());
+        }
+        for file in files {
             for item in self.prune_decls(&file.items) {
                 self.register(item);
             }
         }
         self.check_decls();
+        self.check_component_signatures();
+        let components = self.check_components();
         let screens = self.check_screens();
         let mut strings: Vec<LocString> = self.strings.values().map(|(s, _)| s.clone()).collect();
         strings.sort_by(|a, b| a.key.cmp(&b.key));
@@ -141,7 +198,11 @@ impl<'a> Checker<'a> {
             enums: self.enums.values().cloned().collect(),
             models: self.models.values().cloned().collect(),
             repositories: self.repositories.values().cloned().collect(),
-            components: Vec::new(),
+            entities: self.entities.values().cloned().collect(),
+            stores: self.stores.values().cloned().collect(),
+            settings: self.settings.values().cloned().collect(),
+            secures: self.secures.values().cloned().collect(),
+            components,
             screens,
             strings,
         }
@@ -154,10 +215,11 @@ impl<'a> Checker<'a> {
             ast::Item::Model(d) => Global::Model(d),
             ast::Item::Repository(d) => Global::Repository(d),
             ast::Item::Screen(d) => Global::Screen(d),
-            _ => {
-                self.unsupported(&format!("`{}`声明", item.keyword()), name.span);
-                Global::Unsupported
-            }
+            ast::Item::Component(d) => Global::Component(d),
+            ast::Item::Entity(d) => Global::Entity(d),
+            ast::Item::Store(d) => Global::Store(d),
+            ast::Item::Settings(d) => Global::Settings(d),
+            ast::Item::Secure(d) => Global::Secure(d),
         };
         if is_builtin_type(&name.name) {
             self.error(
@@ -165,6 +227,14 @@ impl<'a> Checker<'a> {
                 format!("`{}`是内置类型名称", name.name),
                 name.span,
                 "请换一个名称",
+            );
+            return;
+        }
+        if PLATFORM_TYPES.contains(&name.name.as_str()) {
+            self.diags.push(
+                Diagnostic::error("V1002", format!("`{}`与平台SDK中的类型同名", name.name))
+                    .with_label(name.span, "请换一个名称")
+                    .with_note("生成的Swift或Kotlin代码会直接使用这些平台类型"),
             );
             return;
         }
@@ -178,6 +248,38 @@ impl<'a> Checker<'a> {
         }
         self.check_type_name(name);
         self.globals.insert(name.name.clone(), (global, name.span));
+    }
+
+    /// 按名称查找声明，并检查当前文件是否可见
+    pub fn lookup(&mut self, name: &str, span: Span) -> Option<Global<'a>> {
+        let (g, decl) = *self.globals.get(name)?;
+        let file = decl.file;
+        if file == self.current {
+            return Some(g);
+        }
+        if self
+            .visible
+            .get(&self.current)
+            .is_some_and(|v| v.contains(&file))
+        {
+            self.used_imports.insert((self.current, file));
+            return Some(g);
+        }
+        let target = self.paths.get(&file).cloned().unwrap_or_default();
+        let from = self.paths.get(&self.current).cloned().unwrap_or_default();
+        self.diags.push(
+            Diagnostic::error(
+                "V1034",
+                format!("`{name}`声明在{target}中，当前文件没有import它"),
+            )
+            .with_label(span, "")
+            .with_secondary(decl, "声明于此")
+            .with_note(format!(
+                "在文件开头添加`import \"{}\"`",
+                relative_path(&from, &target)
+            )),
+        );
+        Some(g)
     }
 
     pub fn check_type_name(&mut self, name: &ast::Ident) {
@@ -203,9 +305,91 @@ impl<'a> Checker<'a> {
     }
 }
 
+/// 生成代码会用到的平台类型，用户声明不能与之同名
+const PLATFORM_TYPES: &[&str] = &[
+    "Any",
+    "Array",
+    "Binding",
+    "Box",
+    "Button",
+    "Color",
+    "Column",
+    "Composable",
+    "Container",
+    "Context",
+    "Data",
+    "DataStore",
+    "Dictionary",
+    "Divider",
+    "Environment",
+    "Error",
+    "Factory",
+    "Flow",
+    "Font",
+    "ForEach",
+    "Group",
+    "Image",
+    "Instant",
+    "Label",
+    "Modifier",
+    "Never",
+    "Nothing",
+    "Observable",
+    "Optional",
+    "Pair",
+    "Preferences",
+    "Result",
+    "Row",
+    "Schema",
+    "ScrollView",
+    "Set",
+    "Slider",
+    "Spacer",
+    "State",
+    "Task",
+    "Text",
+    "Toggle",
+    "Triple",
+    "UUID",
+    "Unit",
+    "URL",
+    "View",
+    "ViewModel",
+];
+
 pub(crate) fn is_builtin_type(name: &str) -> bool {
     matches!(
         name,
         "Bool" | "Int" | "Double" | "String" | "Date" | "List" | "Stream" | "Action" | "Binding"
     )
+}
+
+/// 计算从`from`所在目录到`to`的相对路径，路径分隔符为`/`
+pub(crate) fn relative_path(from: &str, to: &str) -> String {
+    let from_dir: Vec<&str> = from.split('/').filter(|p| !p.is_empty()).collect();
+    let from_dir = &from_dir[..from_dir.len().saturating_sub(1)];
+    let target: Vec<&str> = to.split('/').filter(|p| !p.is_empty()).collect();
+    let common = from_dir
+        .iter()
+        .zip(&target)
+        .take_while(|(a, b)| a == b)
+        .count();
+    let mut parts: Vec<&str> = vec![".."; from_dir.len() - common];
+    parts.extend(&target[common..]);
+    parts.join("/")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::relative_path;
+
+    #[test]
+    fn computes_relative_paths() {
+        assert_eq!(relative_path("ui/a.vey", "ui/b.vey"), "b.vey");
+        assert_eq!(
+            relative_path("ui/screens/a.vey", "ui/stores/b.vey"),
+            "../stores/b.vey"
+        );
+        assert_eq!(relative_path("a.vey", "ui/b.vey"), "ui/b.vey");
+    }
 }

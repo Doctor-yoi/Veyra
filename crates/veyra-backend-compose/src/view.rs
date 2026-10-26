@@ -6,10 +6,10 @@
 //! SwiftUI的修饰符由内向外包裹，Compose的Modifier链由外向内生效，
 //! 因此链式修饰符需要倒序输出
 
-use veyra_codegen::CodeWriter;
+use veyra_codegen::{CodeWriter, pascal_case};
 use veyra_ir::{
-    ActionRef, BindingRef, Builtin, Element, ElementKind, Expr, ExprKind, Modifier, ModifierKind,
-    UnaryOp, Value, ViewNode,
+    ActionRef, AndroidElement, AndroidModifier, BindingRef, Builtin, Element, ElementKind, Expr,
+    ExprKind, Modifier, ModifierKind, NativeSegment, UnaryOp, Value, ViewNode,
 };
 
 use crate::kotlin::{self, ExprCx, Imports, dp, float, ident};
@@ -87,8 +87,56 @@ impl ViewEmitter<'_> {
                     w.line(format!("if ({c}) {{"));
                     self.if_tail(w, then, else_, parent);
                 }
+                ViewNode::Debug { then, else_ } => {
+                    let flag = self.build_config();
+                    if then.is_empty() {
+                        w.line(format!("if (!{flag}) {{"));
+                        w.indent();
+                        self.nodes(w, else_, parent);
+                        w.dedent();
+                        w.line("}");
+                    } else {
+                        w.line(format!("if ({flag}) {{"));
+                        w.indent();
+                        self.nodes(w, then, parent);
+                        w.dedent();
+                        if else_.is_empty() {
+                            w.line("}");
+                        } else {
+                            w.line("} else {");
+                            w.indent();
+                            self.nodes(w, else_, parent);
+                            w.dedent();
+                            w.line("}");
+                        }
+                    }
+                }
+                ViewNode::Native(segments) => {
+                    let mut code = String::new();
+                    for seg in segments {
+                        match seg {
+                            NativeSegment::Text(t) => code.push_str(t),
+                            NativeSegment::Expr(x) => {
+                                let v = self.e(x);
+                                code.push_str(&v);
+                            }
+                            NativeSegment::Action(a) => {
+                                code.push_str(&format!("{}.{}", self.actions, ident(a)))
+                            }
+                            NativeSegment::Callback(c) => code.push_str(&ident(c)),
+                        }
+                    }
+                    w.line(code);
+                }
             }
         }
+    }
+
+    /// 应用的BuildConfig.DEBUG
+    fn build_config(&mut self) -> String {
+        let path = format!("{}.BuildConfig", self.im.r_package);
+        self.im.add(&path);
+        "BuildConfig.DEBUG".into()
     }
 
     fn if_tail(
@@ -141,7 +189,7 @@ impl ViewEmitter<'_> {
                 format!("{{ {}.{}(it{convert}) }}", self.actions, ident(setter)),
             ),
             Some(BindingRef::Param { name, .. }) => {
-                let cb = format!("on{}Change", veyra_codegen::pascal_case(name));
+                let cb = format!("on{}Change", pascal_case(name));
                 (ident(name), format!("{{ {cb}(it{convert}) }}"))
             }
             None => ("TODO()".into(), "{}".into()),
@@ -162,6 +210,7 @@ impl ViewEmitter<'_> {
         }
         for m in mods.iter().rev() {
             let arg = |n: &str| m.arg(n);
+            let before = parts.len();
             match m.kind {
                 ModifierKind::Padding => {
                     self.im.add("androidx.compose.foundation.layout.padding");
@@ -234,7 +283,43 @@ impl ViewEmitter<'_> {
                     w.line(format!("val {name} = {value}"));
                     parts.push(format!("semantics {{ contentDescription = {name} }}"));
                 }
-                ModifierKind::Font | ModifierKind::Foreground | ModifierKind::Disabled => {}
+                ModifierKind::Android(a) => {
+                    let (name, call) = match a {
+                        AndroidModifier::ImePadding => (
+                            "androidx.compose.foundation.layout.imePadding",
+                            "imePadding()".to_string(),
+                        ),
+                        AndroidModifier::SystemBarsPadding => (
+                            "androidx.compose.foundation.layout.systemBarsPadding",
+                            "systemBarsPadding()".to_string(),
+                        ),
+                        AndroidModifier::TestTag => {
+                            let tag = self.ev(arg("_"));
+                            (
+                                "androidx.compose.ui.platform.testTag",
+                                format!("testTag({tag})"),
+                            )
+                        }
+                    };
+                    self.im.add(name);
+                    parts.push(call);
+                }
+                ModifierKind::Ios(_)
+                | ModifierKind::Font
+                | ModifierKind::Foreground
+                | ModifierKind::Disabled => {}
+            }
+            // 只在调试或发布构建中生效的修饰符
+            if let Some(debug) = m.debug
+                && parts.len() > before
+            {
+                let added: Vec<String> = parts.drain(before..).collect();
+                let flag = self.build_config();
+                let cond = if debug { flag } else { format!("!{flag}") };
+                parts.push(format!(
+                    "then(if ({cond}) Modifier.{} else Modifier)",
+                    added.join(".")
+                ));
             }
         }
         if parts.is_empty() && base == "Modifier" {
@@ -336,10 +421,54 @@ impl ViewEmitter<'_> {
         parent: Parent,
         base: Option<&str>,
     ) {
-        let ElementKind::Builtin(b) = &el.kind else {
-            return;
-        };
         let base = base.unwrap_or("Modifier");
+        let b = match &el.kind {
+            ElementKind::Builtin(b) => b,
+            ElementKind::Android(AndroidElement::FloatingActionButton) => {
+                self.im
+                    .add("androidx.compose.material3.FloatingActionButton");
+                let a = self.action(el.arg("action"));
+                let mut call = Call::new("FloatingActionButton");
+                call.arg("onClick", format!("{{ {a} }}"));
+                if let Some(m) = self.modifier_chain(w, &el.modifiers, None, base) {
+                    call.arg("modifier", m);
+                }
+                call.render(w, Some("{"));
+                w.indent();
+                let text = self.ev(el.arg("_"));
+                self.text_call(text, &[]).render(w, None);
+                w.dedent();
+                w.line("}");
+                return;
+            }
+            ElementKind::Ios(_) => return,
+            ElementKind::Component(name) => {
+                let mut call = Call::new(name);
+                for (n, v) in &el.args {
+                    match v {
+                        Value::Expr(x) => {
+                            let value = self.e(x);
+                            call.arg(&ident(n), value);
+                        }
+                        Value::Action(_) => {
+                            let a = self.action(Some(v));
+                            call.arg(&ident(n), format!("{{ {a} }}"));
+                        }
+                        Value::Binding(_) => {
+                            let (value, change) = self.binding(Some(v), "");
+                            call.arg(&ident(n), value);
+                            call.arg(&format!("on{}Change", pascal_case(n)), change);
+                        }
+                        Value::KeyPath(_) | Value::Token(_) => {}
+                    }
+                }
+                if let Some(m) = self.modifier_chain(w, &el.modifiers, None, base) {
+                    call.arg("modifier", m);
+                }
+                call.render(w, None);
+                return;
+            }
+        };
         let mods = &el.modifiers;
         let arg = |n: &str| el.arg(n);
         match b {

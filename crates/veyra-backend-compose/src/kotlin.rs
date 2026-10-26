@@ -6,7 +6,7 @@
 use std::collections::BTreeSet;
 
 use veyra_codegen::{escape_ident, snake_case};
-use veyra_ir::{BinaryOp, Expr, ExprKind, Type, UnaryOp};
+use veyra_ir::{BinaryOp, DateLength, Expr, ExprKind, FormatStyle, Type, UnaryOp};
 
 const KEYWORDS: &[&str] = &[
     "as",
@@ -221,6 +221,43 @@ fn emit(cx: ExprCx, e: &Expr, im: &mut Imports) -> (String, u8) {
             let xs = expr(cx, x, im);
             let ys = expr(cx, y, im);
             (format!("if ({cs}) {xs} else {ys}"), 0)
+        }
+        ExprKind::Plural { key, count } => {
+            im.add("androidx.compose.ui.res.pluralStringResource");
+            im.add_r();
+            let c = expr(cx, count, im);
+            a(format!(
+                "pluralStringResource(R.plurals.{}, {c}, {c})",
+                resource_name(key)
+            ))
+        }
+        ExprKind::Format { value, style } => {
+            let v = expr(cx, value, im);
+            let date = |l: DateLength| match l {
+                DateLength::Short => "FormatStyle.SHORT",
+                DateLength::Medium => "FormatStyle.MEDIUM",
+                DateLength::Long => "FormatStyle.LONG",
+                DateLength::Full => "FormatStyle.FULL",
+            };
+            let call = match style {
+                FormatStyle::Number => format!("veyraFormatNumber({v})"),
+                FormatStyle::Percent => format!("veyraFormatPercent({v})"),
+                FormatStyle::Currency(code) => {
+                    format!("veyraFormatCurrency({v}, {})", string_literal(code))
+                }
+                FormatStyle::Date(l) => format!("veyraFormatDate({v}, date = {})", date(*l)),
+                FormatStyle::Time(l) => format!("veyraFormatDate({v}, time = {})", date(*l)),
+                FormatStyle::DateTime(l) => {
+                    format!("veyraFormatDate({v}, date = {0}, time = {0})", date(*l))
+                }
+            };
+            if matches!(
+                style,
+                FormatStyle::Date(_) | FormatStyle::Time(_) | FormatStyle::DateTime(_)
+            ) {
+                im.add("java.time.format.FormatStyle");
+            }
+            a(call)
         }
         ExprKind::Loc { key, args } => {
             im.add("androidx.compose.ui.res.stringResource");

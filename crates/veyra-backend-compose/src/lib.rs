@@ -15,8 +15,10 @@
 //! 本地化文案生成到`res/values*/veyra_strings.xml`
 
 mod kotlin;
+mod preferences;
 mod resources;
 mod screen;
+mod storage;
 mod view;
 
 use std::path::PathBuf;
@@ -24,7 +26,7 @@ use std::path::PathBuf;
 use serde::Deserialize;
 use veyra_codegen::{Backend, BackendInput, CodeWriter, GENERATED_NOTICE, OutputFile, camel_case};
 use veyra_diagnostics::{Diagnostic, Diagnostics};
-use veyra_ir::{Platform, Program};
+use veyra_ir::{ComponentParamType, Platform, Program};
 
 use crate::kotlin::{Imports, ident};
 
@@ -35,6 +37,8 @@ pub enum Di {
     /// 通过CompositionLocal提供依赖，构造器注入ViewModel
     #[default]
     Manual,
+    /// 使用Hilt注入ViewModel
+    Hilt,
 }
 
 /// `[compose]`配置段
@@ -52,6 +56,10 @@ pub struct Options {
     /// R类所在的包名，默认与package相同
     pub r_package: Option<String>,
     pub di: Di,
+    /// Room数据库文件名
+    pub database: String,
+    /// Room数据库版本，表结构变化时递增
+    pub database_version: u32,
 }
 
 impl Default for Options {
@@ -63,6 +71,8 @@ impl Default for Options {
             package: "com.example.app.ui".into(),
             r_package: None,
             di: Di::Manual,
+            database: "veyra.db".into(),
+            database_version: 1,
         }
     }
 }
@@ -132,14 +142,75 @@ impl Backend for ComposeBackend {
                 repositories(program, &options),
             ));
         }
-        if program.screens.iter().any(|s| !s.injects.is_empty()) {
+        if options.di == Di::Manual && program.screens.iter().any(|s| !s.injects.is_empty()) {
             files.push(OutputFile::generated(
                 file("VeyraDependencies"),
                 dependencies(program, &options),
             ));
         }
+        if program.any_expr(|e| matches!(e.kind, veyra_ir::ExprKind::Format { .. })) {
+            files.push(OutputFile::generated(
+                file("VeyraFormat"),
+                format_helpers(&options),
+            ));
+        }
         files.extend(resources::strings(input.catalog, &options.res)?);
 
+        if !program.entities.is_empty() {
+            for e in &program.entities {
+                files.push(OutputFile::generated(
+                    file(&format!("{}Entity", e.name)),
+                    storage::entity(e, &options),
+                ));
+            }
+            for st in &program.stores {
+                files.push(OutputFile::generated(
+                    file(&st.name),
+                    storage::store(st, program, &options),
+                ));
+            }
+            files.push(OutputFile::generated(
+                file("VeyraDatabase"),
+                storage::database(program, &options),
+            ));
+            files.push(OutputFile::user_owned(
+                user_dir.join("VeyraMigrations.kt"),
+                storage::migrations(&options),
+            ));
+        }
+        for st in &program.settings {
+            files.push(OutputFile::generated(
+                file(&st.name),
+                preferences::settings(st, &options),
+            ));
+        }
+        for st in &program.secures {
+            files.push(OutputFile::generated(
+                file(&st.name),
+                preferences::secure(st, &options),
+            ));
+        }
+        if !program.secures.is_empty() {
+            files.push(OutputFile::generated(
+                file("VeyraVault"),
+                preferences::vault(&options),
+            ));
+        }
+        let local = !program.entities.is_empty()
+            || !program.settings.is_empty()
+            || !program.secures.is_empty();
+        if options.di == Di::Hilt && local {
+            files.push(OutputFile::generated(
+                file("VeyraLocalModule"),
+                storage::hilt_module(program, &options),
+            ));
+        }
+        if !program.components.is_empty() {
+            files.push(OutputFile::generated(
+                file("Components"),
+                components(program, &options),
+            ));
+        }
         for s in &program.screens {
             files.push(OutputFile::generated(
                 file(&format!("{}UiState", s.name)),
@@ -280,5 +351,86 @@ fn dependencies(program: &Program, options: &Options) -> String {
             );
         },
     );
+    generated(&options.package, &im, &w.finish())
+}
+
+/// `format()`使用的格式化函数，跟随系统区域设置
+fn format_helpers(options: &Options) -> String {
+    let mut im = Imports::new(options.r_package());
+    for i in [
+        "java.text.NumberFormat",
+        "java.time.Instant",
+        "java.time.ZoneId",
+        "java.time.format.DateTimeFormatter",
+        "java.time.format.FormatStyle",
+        "java.util.Currency",
+    ] {
+        im.add(i);
+    }
+    let body = r#"internal fun veyraFormatNumber(value: Number): String = NumberFormat.getInstance().format(value)
+
+internal fun veyraFormatPercent(value: Double): String = NumberFormat.getPercentInstance().format(value)
+
+internal fun veyraFormatCurrency(value: Number, code: String): String =
+    NumberFormat.getCurrencyInstance().apply { currency = Currency.getInstance(code) }.format(value)
+
+internal fun veyraFormatDate(value: Instant, date: FormatStyle? = null, time: FormatStyle? = null): String {
+    val formatter = when {
+        date != null && time != null -> DateTimeFormatter.ofLocalizedDateTime(date, time)
+        date != null -> DateTimeFormatter.ofLocalizedDate(date)
+        else -> DateTimeFormatter.ofLocalizedTime(time ?: FormatStyle.SHORT)
+    }
+    return formatter.withZone(ZoneId.systemDefault()).format(value)
+}
+"#;
+    generated(&options.package, &im, body)
+}
+
+fn components(program: &Program, options: &Options) -> String {
+    let mut im = Imports::new(options.r_package());
+    im.add("androidx.compose.runtime.Composable");
+    im.add("androidx.compose.ui.Modifier");
+    let mut w = CodeWriter::new("    ");
+    for c in &program.components {
+        w.line("@Composable");
+        w.line(format!("fun {}(", c.name));
+        w.indent();
+        for p in &c.params {
+            let name = ident(&p.name);
+            match &p.ty {
+                ComponentParamType::Value(t) => {
+                    w.line(format!("{name}: {},", kotlin::ty(t, &mut im)))
+                }
+                ComponentParamType::Action => w.line(format!("{name}: () -> Unit,")),
+                ComponentParamType::Binding(t) => {
+                    let t = kotlin::ty(t, &mut im);
+                    w.line(format!("{name}: {t},"));
+                    w.line(format!(
+                        "on{}Change: ({t}) -> Unit,",
+                        veyra_codegen::pascal_case(&p.name)
+                    ));
+                }
+            }
+        }
+        w.line("modifier: Modifier = Modifier,");
+        w.dedent();
+        w.line(") {");
+        w.indent();
+        let mut em = view::ViewEmitter {
+            cx: kotlin::ExprCx { state: "" },
+            actions: "",
+            im: &mut im,
+            temp: 0,
+        };
+        match c.body.as_slice() {
+            [veyra_ir::ViewNode::Element(root)] => {
+                em.element(&mut w, root, view::Parent::Other, Some("modifier"))
+            }
+            nodes => em.nodes(&mut w, nodes, view::Parent::Other),
+        }
+        w.dedent();
+        w.line("}");
+        w.blank();
+    }
     generated(&options.package, &im, &w.finish())
 }

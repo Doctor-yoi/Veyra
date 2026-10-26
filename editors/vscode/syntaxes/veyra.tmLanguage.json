@@ -1,0 +1,195 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Veyra",
+  "scopeName": "source.veyra",
+  "fileTypes": ["vey"],
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#directives" },
+    { "include": "#native" },
+    { "include": "#strings" },
+    { "include": "#declarations" },
+    { "include": "#keywords" },
+    { "include": "#attributes" },
+    { "include": "#constants" },
+    { "include": "#numbers" },
+    { "include": "#functions" },
+    { "include": "#modifiers" },
+    { "include": "#platform" },
+    { "include": "#types" },
+    { "include": "#implicit-members" },
+    { "include": "#operators" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.veyra",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.veyra",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "directives": {
+      "match": "^\\s*(#(?:if|elseif|else|endif))\\b(.*)$",
+      "captures": {
+        "1": { "name": "keyword.control.directive.veyra" },
+        "2": {
+          "patterns": [
+            { "match": "\\b(ios|android|harmony|debug)\\b", "name": "constant.language.platform.veyra" },
+            { "match": "&&|\\|\\||!", "name": "keyword.operator.logical.veyra" },
+            { "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b", "name": "variable.other.flag.veyra" }
+          ]
+        }
+      }
+    },
+    "native": {
+      "begin": "\\b(native)\\s+(ios|android|harmony)\\s*(\\{)\\s*(\"\"\")",
+      "beginCaptures": {
+        "1": { "name": "keyword.other.native.veyra" },
+        "2": { "name": "constant.language.platform.veyra" },
+        "3": { "name": "punctuation.section.block.begin.veyra" },
+        "4": { "name": "string.quoted.triple.veyra" }
+      },
+      "end": "(\"\"\")\\s*(\\})",
+      "endCaptures": {
+        "1": { "name": "string.quoted.triple.veyra" },
+        "2": { "name": "punctuation.section.block.end.veyra" }
+      },
+      "contentName": "meta.embedded.native.veyra",
+      "patterns": [
+        {
+          "match": "\\{\\{\\s*[A-Za-z_][A-Za-z0-9_.]*\\s*\\}\\}",
+          "name": "variable.other.placeholder.veyra"
+        }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.double.veyra",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        { "match": "\\\\[nrt\"\\\\{}]", "name": "constant.character.escape.veyra" },
+        { "match": "\\{[A-Za-z_][A-Za-z0-9_]*\\}", "name": "variable.other.placeholder.veyra" }
+      ]
+    },
+    "declarations": {
+      "patterns": [
+        {
+          "match": "\\b(enum|model|entity|repository|settings|secure|screen)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "storage.type.veyra" },
+            "2": { "name": "entity.name.type.veyra" }
+          }
+        },
+        {
+          "match": "\\b(store)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+(for)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "storage.type.veyra" },
+            "2": { "name": "entity.name.type.veyra" },
+            "3": { "name": "keyword.other.veyra" },
+            "4": { "name": "entity.name.type.veyra" }
+          }
+        },
+        {
+          "match": "\\b(component)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "storage.type.veyra" },
+            "2": { "name": "entity.name.function.component.veyra" }
+          }
+        },
+        {
+          "match": "\\b(query)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "storage.type.veyra" },
+            "2": { "name": "entity.name.function.veyra" }
+          }
+        },
+        {
+          "match": "\\b(import)\\b",
+          "name": "keyword.control.import.veyra"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "match": "\\b(inject|state|computed|actions|effects|lifecycle|view)\\b",
+          "name": "keyword.other.section.veyra"
+        },
+        {
+          "match": "\\b(if|else|in|where|orderBy|limit|asc|desc)\\b",
+          "name": "keyword.control.veyra"
+        },
+        {
+          "match": "\\b(async|throws)\\b",
+          "name": "storage.modifier.veyra"
+        },
+        {
+          "match": "\\b(onAppear|onDisappear)\\b",
+          "name": "support.variable.lifecycle.veyra"
+        }
+      ]
+    },
+    "attributes": {
+      "match": "@[A-Za-z_][A-Za-z0-9_]*",
+      "name": "entity.other.attribute-name.veyra"
+    },
+    "constants": {
+      "match": "\\b(true|false|nil)\\b",
+      "name": "constant.language.veyra"
+    },
+    "numbers": {
+      "match": "\\b[0-9][0-9_]*(\\.[0-9][0-9_]*)?\\b",
+      "name": "constant.numeric.veyra"
+    },
+    "functions": {
+      "match": "\\b(loc|plural|format|bind)(?=\\s*\\()",
+      "name": "support.function.builtin.veyra"
+    },
+    "modifiers": {
+      "match": "(?<=[)}\\s])\\.(?:(ios|android)\\.)?([A-Za-z_][A-Za-z0-9_]*)(?=\\s*\\()",
+      "captures": {
+        "1": { "name": "support.namespace.platform.veyra" },
+        "2": { "name": "entity.name.function.modifier.veyra" }
+      }
+    },
+    "platform": {
+      "match": "\\b(ios|android)\\.([A-Z][A-Za-z0-9_]*)",
+      "captures": {
+        "1": { "name": "support.namespace.platform.veyra" },
+        "2": { "name": "support.class.component.veyra" }
+      }
+    },
+    "types": {
+      "patterns": [
+        {
+          "match": "\\b(Bool|Int|Double|String|Date|List|Stream|Action|Binding)\\b",
+          "name": "support.type.builtin.veyra"
+        },
+        {
+          "match": "\\b(Column|Row|Stack|ScrollView|Text|Button|TextField|SecureField|Toggle|Slider|Image|Spacer|Divider|Progress|List|ForEach)(?=\\s*[({])",
+          "name": "support.class.component.veyra"
+        },
+        {
+          "match": "\\b[A-Z][A-Za-z0-9_]*\\b",
+          "name": "entity.name.type.veyra"
+        }
+      ]
+    },
+    "implicit-members": {
+      "match": "(?<![A-Za-z0-9_)\\]])\\.([a-z][A-Za-z0-9_]*)",
+      "captures": {
+        "1": { "name": "variable.other.enummember.veyra" }
+      }
+    },
+    "operators": {
+      "match": "->|\\?\\?|==|!=|<=|>=|&&|\\|\\||[-+*/%<>!?:=]",
+      "name": "keyword.operator.veyra"
+    }
+  }
+}

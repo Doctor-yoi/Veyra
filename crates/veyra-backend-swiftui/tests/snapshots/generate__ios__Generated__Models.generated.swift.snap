@@ -17,4 +17,5 @@ struct Course: Codable, Hashable, Sendable, Identifiable {
     var credits: Double
     var kind: CourseKind
     var teacher: String?
+    var startsAt: Date
 }

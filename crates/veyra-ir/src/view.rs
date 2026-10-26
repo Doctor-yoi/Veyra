@@ -100,6 +100,51 @@ pub enum ExprKind {
         key: String,
         args: Vec<(String, Expr)>,
     },
+    /// 复数文案，`count`同时作为`{count}`占位符
+    Plural {
+        key: String,
+        count: Box<Expr>,
+    },
+    /// 按用户区域设置格式化为String
+    Format {
+        value: Box<Expr>,
+        style: FormatStyle,
+    },
+}
+
+/// 日期与时间的详略程度
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DateLength {
+    Short,
+    Medium,
+    Long,
+    Full,
+}
+
+impl DateLength {
+    pub const NAMES: [&str; 4] = ["short", "medium", "long", "full"];
+
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "short" => Some(Self::Short),
+            "medium" => Some(Self::Medium),
+            "long" => Some(Self::Long),
+            "full" => Some(Self::Full),
+            _ => None,
+        }
+    }
+}
+
+/// `format()`的样式
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FormatStyle {
+    Number,
+    Percent,
+    /// ISO 4217货币代码
+    Currency(String),
+    Date(DateLength),
+    Time(DateLength),
+    DateTime(DateLength),
 }
 
 /// 命令分发
@@ -257,6 +302,42 @@ pub enum ElementKind {
     Builtin(Builtin),
     /// 用户声明的component
     Component(String),
+    /// 只能出现在`#if ios`中的组件
+    Ios(IosElement),
+    /// 只能出现在`#if android`中的组件
+    Android(AndroidElement),
+}
+
+/// iOS专属组件
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum IosElement {
+    /// 系统分享按钮
+    ShareLink,
+}
+
+/// Android专属组件
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum AndroidElement {
+    FloatingActionButton,
+}
+
+/// iOS专属修饰符
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum IosModifier {
+    /// iOS 26起的Liquid Glass效果，旧系统忽略
+    GlassEffect,
+    NavigationTitle,
+    TextInputAutocapitalization,
+    ListStyle,
+    ScrollDismissesKeyboard,
+}
+
+/// Android专属修饰符
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum AndroidModifier {
+    ImePadding,
+    SystemBarsPadding,
+    TestTag,
 }
 
 /// 组件实例
@@ -279,6 +360,8 @@ impl Element {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ModifierKind {
+    Ios(IosModifier),
+    Android(AndroidModifier),
     Padding,
     Font,
     Foreground,
@@ -314,6 +397,7 @@ impl ModifierKind {
             ModifierKind::Hidden => "hidden",
             ModifierKind::OnTap => "onTap",
             ModifierKind::AccessibilityLabel => "accessibilityLabel",
+            ModifierKind::Ios(_) | ModifierKind::Android(_) => "platform",
         }
     }
 
@@ -326,6 +410,8 @@ impl ModifierKind {
 pub struct Modifier {
     pub kind: ModifierKind,
     pub args: IndexMap<String, Value>,
+    /// `Some(true)`只在调试构建中生效，`Some(false)`只在发布构建中生效
+    pub debug: Option<bool>,
 }
 
 impl Modifier {
@@ -342,4 +428,108 @@ pub enum ViewNode {
         then: Vec<ViewNode>,
         else_: Vec<ViewNode>,
     },
+    /// 由原生构建配置决定的分支，`then`在调试构建中生效
+    Debug {
+        then: Vec<ViewNode>,
+        else_: Vec<ViewNode>,
+    },
+    /// 原样输出的平台代码
+    Native(Vec<NativeSegment>),
+}
+
+/// native代码块中的片段
+#[derive(Clone, Debug, PartialEq)]
+pub enum NativeSegment {
+    Text(String),
+    /// `{{query}}`，替换为读取表达式
+    Expr(Expr),
+    /// `{{refresh}}`，替换为分发入口，例如`viewModel.refresh`
+    Action(String),
+    /// 组件的Action参数，替换为回调本身
+    Callback(String),
+}
+
+impl Expr {
+    /// 先序遍历表达式树
+    pub fn walk(&self, f: &mut dyn FnMut(&Expr)) {
+        f(self);
+        match &self.kind {
+            ExprKind::List(items) => items.iter().for_each(|i| i.walk(f)),
+            ExprKind::Field(b, _)
+            | ExprKind::Count(b)
+            | ExprKind::IsEmpty(b)
+            | ExprKind::First(b)
+            | ExprKind::Unary(_, b) => b.walk(f),
+            ExprKind::Contains(a, b) | ExprKind::Binary(_, a, b) => {
+                a.walk(f);
+                b.walk(f);
+            }
+            ExprKind::Conditional(c, a, b) => {
+                c.walk(f);
+                a.walk(f);
+                b.walk(f);
+            }
+            ExprKind::Loc { args, .. } => args.iter().for_each(|(_, v)| v.walk(f)),
+            ExprKind::Plural { count, .. } => count.walk(f),
+            ExprKind::Format { value, .. } => value.walk(f),
+            _ => {}
+        }
+    }
+}
+
+impl Value {
+    pub fn walk(&self, f: &mut dyn FnMut(&Expr)) {
+        match self {
+            Value::Expr(e) => e.walk(f),
+            Value::Action(ActionRef::Dispatch { args, .. }) => {
+                args.iter().for_each(|(_, v)| v.walk(f))
+            }
+            _ => {}
+        }
+    }
+}
+
+impl ViewNode {
+    /// 遍历视图树中的全部表达式
+    pub fn walk_exprs(&self, f: &mut dyn FnMut(&Expr)) {
+        match self {
+            ViewNode::Element(el) => {
+                el.args.values().for_each(|v| v.walk(f));
+                for m in &el.modifiers {
+                    m.args.values().for_each(|v| v.walk(f));
+                }
+                el.children.iter().for_each(|c| c.walk_exprs(f));
+            }
+            ViewNode::If { cond, then, else_ } => {
+                cond.walk(f);
+                then.iter().chain(else_).for_each(|c| c.walk_exprs(f));
+            }
+            ViewNode::Debug { then, else_ } => {
+                then.iter().chain(else_).for_each(|c| c.walk_exprs(f))
+            }
+            ViewNode::Native(segments) => {
+                for seg in segments {
+                    if let NativeSegment::Expr(e) = seg {
+                        e.walk(f);
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl ViewNode {
+    /// 遍历视图树中的全部组件
+    pub fn walk_elements(&self, f: &mut dyn FnMut(&Element)) {
+        match self {
+            ViewNode::Element(el) => {
+                f(el);
+                el.children.iter().for_each(|c| c.walk_elements(f));
+            }
+            ViewNode::If { then, else_, .. } | ViewNode::Debug { then, else_ } => {
+                then.iter().chain(else_).for_each(|c| c.walk_elements(f));
+            }
+            ViewNode::Native(_) => {}
+        }
+    }
 }

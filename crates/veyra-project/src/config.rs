@@ -10,7 +10,7 @@ use veyra_diagnostics::Diagnostic;
 pub const CONFIG_FILE: &str = "veyra.toml";
 
 /// 已知的顶层配置段，后端段由注册表决定
-const KNOWN_SECTIONS: &[&str] = &["project", "l10n", "flags", "lint", "storage"];
+const KNOWN_SECTIONS: &[&str] = &["project", "l10n", "flags", "lint"];
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]

@@ -1,0 +1,13 @@
+---
+source: crates/veyra-syntax/tests/parse.rs
+expression: "render(\"model A { a: Int }\\nimport \\\"b.vey\\\"\\nmodel C { c: Int }\\n\")"
+---
+error[V0016]: import必须位于文件开头
+ --> test.vey:2:1
+  |
+2 | import "b.vey"
+  | ^^^^^^
+  |
+  = note: 把所有import移到声明之前
+
+error: 共1个错误，0个警告

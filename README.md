@@ -46,6 +46,8 @@ Veyra is written in Rust and requires Rust 1.88 or later.
 cargo install --path crates/veyra-cli
 ```
 
+Syntax highlighting for VS Code lives in [editors/vscode](editors/vscode).
+
 ## Quick start
 
 ```bash
@@ -68,13 +70,52 @@ Every interaction in a view falls into one of three forms, and the compiler chec
 
 Views cannot call arbitrary functions, mutate state or access injected dependencies. Side effects belong in actions, which the view model implements.
 
+Each file sees only its own declarations and those of the files it imports. Import paths are relative to the current file, and imports are not transitive:
+
+```
+import "models.vey"
+import (
+  "stores/NoteStore.vey"
+  "../shared/Theme.vey"
+)
+```
+
+Using a type from a file that is not imported is an error, and the message suggests the missing `import`. Imported files outside `sources` are loaded automatically, and unused imports produce a warning. All declarations still share one namespace, because the generated code lives in one module per platform.
+
 Declarations:
 
 | Declaration | Purpose |
 | --- | --- |
 | `enum`, `model` | Value types shared by all layers |
 | `repository` | Data access contract, implemented natively on each platform |
-| `screen` | A page with `inject`, `state`, `computed`, `actions` and `view` |
+| `entity`, `store` | Persistent data and its data access object |
+| `settings`, `secure` | Simple preferences and credentials |
+| `component` | Reusable view without business state, taking values, `Action` and `Binding<T>` parameters |
+| `screen` | A page with `inject`, `state`, `computed`, `actions`, `effects`, `lifecycle` and `view` |
+
+`effects` declares one-off events such as navigation. The view model emits them with `emit`, and the root view or route receives them through `onEffect`, so views never handle them. `lifecycle` dispatches actions when a screen appears or disappears.
+
+Persistent data is declared once and generated for SwiftData and Room:
+
+```
+entity Note @persistent {
+  id: String @primaryKey
+  courseId: String @indexed
+  text: String
+  createdAt: Date
+}
+
+store NoteStore for Note {
+  query forCourse(course: String) -> Stream<List<Note>> {
+    where courseId == course
+    orderBy createdAt desc
+  }
+}
+```
+
+Every store provides `all`, `find`, `save` and `delete`, plus the declared queries. Conditions support comparisons, `contains`, `nil` checks, Bool fields, `&&`, `||` and `!`, and compile to `#Predicate` on iOS and SQL on Android. Returning `Stream<List<T>>` observes changes, while `List<T>` and `T?` read once. Views and view models only see the value type `Note`, never the persistent `NoteEntity`. `VeyraStorage` and `VeyraStores` set up the SwiftData container, while `VeyraDatabase` and `VeyraStores` set up Room. On Android, increase `database_version` under `[compose]` and add migrations to the generated `VeyraMigrations.kt` when the schema changes.
+
+`settings` generates typed preferences backed by `UserDefaults` and DataStore, and every field needs a default value. `secure` generates credential storage backed by the Keychain on iOS and by values encrypted with an Android Keystore key on Android, without third-party libraries. Both are injected into view models like repositories and stores.
 
 Conditional compilation selects platform-specific content. Platform conditions and custom flags declared in `[flags]` are resolved at compile time, and each platform is type checked separately:
 
@@ -86,7 +127,28 @@ state {
 }
 ```
 
+`debug` is kept in the native code as `#if DEBUG` on iOS and `BuildConfig.DEBUG` on Android, so it can only guard views and modifiers. Android projects need `buildFeatures.buildConfig = true`. Inside a platform block, platform-only components and modifiers are available, such as `ios.ShareLink`, `.ios.glassEffect()`, `android.FloatingActionButton` and `.android.imePadding()`. As a last resort, `native ios { """...""" }` emits code verbatim, with `{{name}}` replaced by state reads or action entry points. Native blocks bypass type checking, so they produce a warning that `[lint] native` can turn off or into an error.
+
+```
+#if ios
+Text(title).ios.glassEffect()
+#elseif android
+android.FloatingActionButton("+", action: add)
+#endif
+#if debug
+Text(buildInfo)
+#endif
+```
+
 Localized text is declared explicitly with `loc(key, sourceText, args...)`. Translations live in `locales/<locale>.toml`, which `veyra build` keeps in sync: new keys are added as empty placeholders, existing translations are preserved, and placeholders are validated against the source text. Plain string literals are emitted verbatim.
+
+```
+Text(plural("cart.items", count, one: "{count} item", other: "{count} items"))
+Text(format(price, .currency("USD")))
+Text(format(startsAt, .dateTime(.short)))
+```
+
+`plural` generates String Catalog plural variations and Android `<plurals>` resources, and each translation provides the plural categories its language needs. `format` supports `.number`, `.percent`, `.currency(code)`, `.date`, `.time` and `.dateTime`, and follows the user's locale through the platform formatters.
 
 ## Generated code
 
@@ -100,6 +162,8 @@ Localized text is declared explicitly with `loc(key, sourceText, args...)`. Tran
 
 Files ending in `.generated.swift` or `.generated.kt` are rewritten on every build. View model skeletons are created once and never overwritten, so business logic stays in files you own. Writes from bindings always go through generated setters, which view models may override to validate input.
 
+Dependencies declared with `inject` only ever reach view models. By default the root view or route reads them from `VeyraDependencies`, which the app provides through the environment or a `CompositionLocal`. Set `di = "factory"` under `[swiftui]` to resolve them with FactoryKit's `@Injected`, or `di = "hilt"` under `[compose]` to generate `@HiltViewModel` view models.
+
 ## Commands
 
 | Command | Description |
@@ -107,6 +171,7 @@ Files ending in `.generated.swift` or `.generated.kt` are rewritten on every bui
 | `veyra init [path]` | Create a project |
 | `veyra check` | Check sources without writing files |
 | `veyra build` | Check sources and generate code |
+| `veyra fmt [--check] [files]` | Format sources, keeping comments |
 | `veyra l10n status` | Show translation progress |
 | `veyra l10n prune` | Remove translations whose keys no longer exist |
 

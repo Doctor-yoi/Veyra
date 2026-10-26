@@ -38,6 +38,22 @@ impl<'a> Checker<'a> {
             }
         }
         for g in &globals {
+            if let Global::Entity(d) = g {
+                self.models.insert(
+                    d.name.name.clone(),
+                    ModelDef {
+                        name: d.name.name.clone(),
+                        fields: Vec::new(),
+                    },
+                );
+            }
+        }
+        for g in &globals {
+            if let Global::Entity(d) = g {
+                self.check_entity(d);
+            }
+        }
+        for g in &globals {
             if let Global::Model(d) = g {
                 let fields = self.check_model_fields(d);
                 if let Some(m) = self.models.get_mut(&d.name.name) {
@@ -50,6 +66,18 @@ impl<'a> Checker<'a> {
             if let Global::Repository(d) = g {
                 let def = self.check_repository(d);
                 self.repositories.insert(def.name.clone(), def);
+            }
+        }
+        for g in &globals {
+            if let Global::Store(d) = g {
+                self.check_store(d);
+            }
+        }
+        for g in &globals {
+            match g {
+                Global::Settings(d) => self.check_settings(d),
+                Global::Secure(d) => self.check_secure(d),
+                _ => {}
             }
         }
     }
@@ -85,6 +113,7 @@ impl<'a> Checker<'a> {
     }
 
     fn check_model_fields(&mut self, d: &'a ast::ModelDecl) -> Vec<FieldDef> {
+        self.current = d.span.file;
         let mut out: Vec<FieldDef> = Vec::new();
         for field in self.prune_decls(&d.fields) {
             self.check_member_name(&field.name);
@@ -162,6 +191,7 @@ impl<'a> Checker<'a> {
     }
 
     fn check_repository(&mut self, d: &'a ast::RepositoryDecl) -> RepositoryDef {
+        self.current = d.span.file;
         let mut methods: Vec<MethodDef> = Vec::new();
         for m in self.prune_decls(&d.methods) {
             self.check_member_name(&m.name);
@@ -277,9 +307,11 @@ impl<'a> Checker<'a> {
                         }
                         return Type::Stream(Box::new(inner));
                     }
-                    other => match self.globals.get(other).map(|(g, _)| *g) {
+                    other => match self.lookup(other, name.span) {
                         Some(Global::Enum(_)) => Type::Enum(other.to_string()),
-                        Some(Global::Model(_)) => Type::Model(other.to_string()),
+                        Some(Global::Model(_) | Global::Entity(_)) => {
+                            Type::Model(other.to_string())
+                        }
                         Some(_) => {
                             self.error("V2006", format!("`{other}`不是值类型"), name.span, "");
                             return Type::Unknown;

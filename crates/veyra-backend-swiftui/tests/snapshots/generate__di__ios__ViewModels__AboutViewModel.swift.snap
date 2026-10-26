@@ -1,0 +1,12 @@
+---
+source: crates/veyra-backend-swiftui/tests/generate.rs
+expression: f.contents
+---
+// This file is created by Veyra and will not be overwritten
+
+import Foundation
+
+@MainActor
+final class AboutViewModel: AboutViewModelContract {
+    let state = AboutState()
+}

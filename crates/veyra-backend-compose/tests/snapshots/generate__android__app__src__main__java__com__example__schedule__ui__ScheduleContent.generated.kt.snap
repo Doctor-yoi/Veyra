@@ -20,6 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -32,13 +33,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.example.schedule.BuildConfig
 import com.example.schedule.R
+import java.time.format.FormatStyle
 
 @Composable
 fun ScheduleContent(
@@ -65,6 +70,20 @@ fun ScheduleContent(
                 onValueChange = { actions.setQuery(it) },
                 label = { Text(text = stringResource(R.string.schedule_search)) },
             )
+            SearchBar(text = state.query, onTextChange = { actions.setQuery(it) }, placeholder = "搜索")
+            FloatingActionButton(onClick = { actions.refresh() }, modifier = Modifier.testTag("fab")) {
+                Text(text = "+")
+            }
+            Text(text = state.query)
+            if (BuildConfig.DEBUG) {
+                Text(text = "debug build")
+            } else {
+                Text(text = "release build")
+            }
+            Text(
+                text = "tag",
+                modifier = Modifier.background(Color.Blue).then(if (BuildConfig.DEBUG) Modifier.padding(4.0.dp) else Modifier),
+            )
             OutlinedTextField(
                 value = state.password,
                 onValueChange = { actions.setPassword(it) },
@@ -80,6 +99,8 @@ fun ScheduleContent(
                 onValueChange = { actions.setVolume(it.toDouble()) },
                 valueRange = 0.0f..1.0f,
             )
+            Text(text = veyraFormatPercent(state.volume))
+            Text(text = pluralStringResource(R.plurals.schedule_items, state.count, state.count))
             Button(
                 onClick = { actions.refresh() },
                 enabled = state.canRefresh,
@@ -101,10 +122,18 @@ fun ScheduleContent(
                         ) {
                             Image(painter = painterResource(id = R.drawable.book), contentDescription = null)
                             Text(text = course.name, style = MaterialTheme.typography.titleMedium)
+                            Text(text = veyraFormatNumber(course.credits))
+                            Text(text = veyraFormatDate(course.startsAt, date = FormatStyle.SHORT, time = FormatStyle.SHORT))
+                            Text(text = veyraFormatCurrency(course.credits, "CNY"))
                             Spacer(modifier = Modifier.weight(1f))
                             Text(text = course.teacher ?: "-", color = Color.Gray)
                         }
                     }
+                }
+            }
+            state.items.forEach { course ->
+                key(course.id) {
+                    CourseCard(course = course, note = null, onTap = { actions.openCourse(id = course.id) })
                 }
             }
             HorizontalDivider()

@@ -18,6 +18,11 @@ enum L10n {
         String(localized: "schedule.empty", defaultValue: "暂无课程", table: "Veyra")
     }
 
+    /// {count}门课
+    static func scheduleItems(count: Int) -> String {
+        String(localized: "schedule.items", defaultValue: "\(count)门课", table: "Veyra")
+    }
+
     /// 上课提醒
     static var scheduleNotify: String {
         String(localized: "schedule.notify", defaultValue: "上课提醒", table: "Veyra")
@@ -31,6 +36,11 @@ enum L10n {
     /// 搜索课程
     static var scheduleSearch: String {
         String(localized: "schedule.search", defaultValue: "搜索课程", table: "Veyra")
+    }
+
+    /// 分享
+    static var scheduleShare: String {
+        String(localized: "schedule.share", defaultValue: "分享", table: "Veyra")
     }
 
     /// 我的课表

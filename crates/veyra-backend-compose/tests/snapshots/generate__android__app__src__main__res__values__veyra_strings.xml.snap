@@ -7,6 +7,9 @@ expression: f.contents
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
     <string name="schedule_count">共%1$d门课程，筛选：%2$s</string>
     <string name="schedule_empty">暂无课程</string>
+    <plurals name="schedule_items">
+        <item quantity="other">%1$d门课</item>
+    </plurals>
     <string name="schedule_notify">上课提醒</string>
     <string name="schedule_refresh">刷新</string>
     <string name="schedule_search">搜索课程</string>

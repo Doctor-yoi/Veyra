@@ -1,0 +1,35 @@
+---
+source: crates/veyra-sema/tests/ui.rs
+expression: out
+---
+error[V3032]: effect只声明名称与参数
+  --> err_lifecycle.vey:11:5
+   |
+11 |     open(id: String) async
+   |     ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: effect由ViewModel发出、由组装层处理，不能有async、throws或返回值
+
+error[V3031]: 生命周期事件`onAppear`重复
+  --> err_lifecycle.vey:15:5
+   |
+15 |     onAppear: load(id)
+   |     ^^^^^^^^
+
+error[V3030]: 未知的生命周期事件`onResume`
+  --> err_lifecycle.vey:16:5
+   |
+16 |     onResume: load
+   |     ^^^^^^^^
+   |
+   = note: 可用的事件：onAppear、onDisappear
+
+error[V3033]: `back`是effect，不能由View触发
+  --> err_lifecycle.vey:17:18
+   |
+17 |     onDisappear: back
+   |                  ^^^^
+   |
+   = note: effect由ViewModel通过emit发出，View只能分发action
+
+error: 共4个错误，0个警告

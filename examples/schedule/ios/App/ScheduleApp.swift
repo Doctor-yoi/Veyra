@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 @MainActor
@@ -22,7 +23,19 @@ final class InMemoryCourseRepository: CourseRepository {
 
 @MainActor
 final class AppDependencies: VeyraDependencies {
+    let container: ModelContainer
+    let stores: VeyraStores
     let courseRepository: any CourseRepository = InMemoryCourseRepository()
+
+    let appPreferences: any AppPreferences = UserDefaultsAppPreferences()
+    let account: any Account = KeychainAccount()
+
+    var noteStore: any NoteStore { stores.noteStore }
+
+    init() {
+        container = try! VeyraStorage.makeContainer()
+        stores = VeyraStores(context: container.mainContext)
+    }
 }
 
 @main
@@ -34,6 +47,8 @@ struct ScheduleApp: App {
             TabView {
                 ScheduleRoot()
                     .tabItem { Label(L10n.scheduleTitle, systemImage: "calendar") }
+                NotesRoot()
+                    .tabItem { Label(L10n.notesAdd, systemImage: "note.text") }
                 SettingsRoot()
                     .tabItem { Label(L10n.settingsTitle, systemImage: "gear") }
             }

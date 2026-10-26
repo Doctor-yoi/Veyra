@@ -1,0 +1,50 @@
+{
+  "Screen": {
+    "prefix": "screen",
+    "body": [
+      "screen ${1:Name} {",
+      "  state {",
+      "    ${2:value}: ${3:String} = ${4:\"\"} @writable",
+      "  }",
+      "",
+      "  actions {",
+      "    ${5:refresh}() async",
+      "  }",
+      "",
+      "  view {",
+      "    Column(spacing: 12) {",
+      "      $0",
+      "    }",
+      "  }",
+      "}"
+    ],
+    "description": "Screen with state, actions and view"
+  },
+  "Component": {
+    "prefix": "component",
+    "body": ["component ${1:Name}(${2:title}: ${3:String}) {", "  $0", "}"],
+    "description": "Reusable component"
+  },
+  "Entity": {
+    "prefix": "entity",
+    "body": [
+      "entity ${1:Name} @persistent {",
+      "  id: String @primaryKey",
+      "  $0",
+      "}",
+      "",
+      "store ${1:Name}Store for ${1:Name} {}"
+    ],
+    "description": "Persistent entity with its store"
+  },
+  "Localized text": {
+    "prefix": "loc",
+    "body": ["loc(\"${1:key}\", \"${2:text}\")"],
+    "description": "Localized text"
+  },
+  "Platform condition": {
+    "prefix": "#if",
+    "body": ["#if ${1:ios}", "$0", "#endif"],
+    "description": "Conditional compilation block"
+  }
+}

@@ -146,17 +146,29 @@ fn unit(state: &str, value: String) -> Value {
     json!({ "stringUnit": { "state": state, "value": value } })
 }
 
+/// 复数变体
+fn plural(state: &str, forms: &IndexMap<String, String>, s: &LocString) -> Value {
+    let mut variants = Map::new();
+    for (cat, text) in forms {
+        variants.insert(cat.clone(), unit(state, format_string(text, s)));
+    }
+    json!({ "variations": { "plural": variants } })
+}
+
 fn entry(catalog: &Catalog, e: &CatalogEntry) -> Value {
     let s = &e.string;
     let mut locs = Map::new();
-    locs.insert(
-        catalog.source_locale.clone(),
-        unit("translated", format_string(&s.source, s)),
-    );
+    let source = match &s.plural {
+        Some(p) => plural("translated", &p.forms, s),
+        None => unit("translated", format_string(&s.source, s)),
+    };
+    locs.insert(catalog.source_locale.clone(), source);
     for locale in &catalog.target_locales {
-        let value = match e.translations.get(locale) {
-            Some(Translation::Text(t)) => unit("translated", format_string(t, s)),
-            _ => unit("new", format_string(&s.source, s)),
+        let value = match (e.translations.get(locale), &s.plural) {
+            (Some(Translation::Text(t)), _) => unit("translated", format_string(t, s)),
+            (Some(Translation::Plural(forms)), _) => plural("translated", forms, s),
+            (None, Some(p)) => plural("new", &p.forms, s),
+            (None, None) => unit("new", format_string(&s.source, s)),
         };
         locs.insert(locale.clone(), value);
     }

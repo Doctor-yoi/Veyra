@@ -5,6 +5,7 @@ import Foundation
 @MainActor
 final class ScheduleViewModel: ScheduleViewModelContract {
     let state = ScheduleState()
+    var onEffect: ((ScheduleEffect) -> Void)?
 
     private let courses: any CourseRepository
 
@@ -26,6 +27,6 @@ final class ScheduleViewModel: ScheduleViewModelContract {
     }
 
     func openCourse(id: String) {
-        // Navigation is handled by the app
+        emit(.showCourse(id: id))
     }
 }

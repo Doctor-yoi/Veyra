@@ -6,8 +6,8 @@
 use indexmap::{IndexMap, IndexSet};
 use veyra_diagnostics::{Diagnostic, Span};
 use veyra_ir::{
-    self as ir, ActionRef, BindingRef, ExprKind, LocArg, LocArgType, LocString, Segment, Type,
-    parse_template,
+    self as ir, ActionRef, BindingRef, ComponentParamType, ExprKind, LocArg, LocArgType, LocString,
+    Segment, Type, parse_template,
 };
 use veyra_syntax::ast::{self, Arg, ExprKind as A};
 
@@ -31,10 +31,13 @@ pub(crate) struct ScreenInfo {
     pub computed: IndexMap<String, Type>,
     pub actions: IndexMap<String, ActionInfo>,
     pub injects: IndexSet<String>,
+    pub effects: IndexSet<String>,
 }
 
 pub(crate) enum Owner<'s> {
     Screen(&'s ScreenInfo),
+    /// 组件只能访问自己的参数
+    Component(&'s [ir::ComponentParam]),
     /// state默认值，只允许常量
     Constant,
 }
@@ -58,7 +61,22 @@ impl<'s> Scope<'s> {
     fn screen(&self) -> Option<&'s ScreenInfo> {
         match self.owner {
             Owner::Screen(s) => Some(s),
-            Owner::Constant => None,
+            Owner::Component(_) | Owner::Constant => None,
+        }
+    }
+
+    pub fn is_action(&self, name: &str) -> bool {
+        self.screen().is_some_and(|s| s.actions.contains_key(name))
+    }
+
+    pub fn is_action_param(&self, name: &str) -> bool {
+        matches!(self.component_param(name), Some(ComponentParamType::Action))
+    }
+
+    fn component_param(&self, name: &str) -> Option<&'s ComponentParamType> {
+        match self.owner {
+            Owner::Component(ps) => ps.iter().find(|p| p.name == name).map(|p| &p.ty),
+            _ => None,
         }
     }
 }
@@ -187,6 +205,7 @@ impl<'a> Checker<'a> {
                 if let A::Ident(n) = &base.kind
                     && self.lookup_local(sc, n).is_none()
                     && matches!(self.globals.get(n.as_str()), Some((Global::Enum(_), _)))
+                    && matches!(self.lookup(n, base.span), Some(Global::Enum(_)))
                 {
                     return self.enum_case(n.clone(), name);
                 }
@@ -266,6 +285,21 @@ impl<'a> Checker<'a> {
     fn ident(&mut self, sc: &Scope, name: &str, span: Span) -> ir::Expr {
         if let Some(ty) = self.lookup_local(sc, name) {
             return ir::Expr::new(ExprKind::Local(name.to_string()), ty);
+        }
+        match sc.component_param(name) {
+            Some(ComponentParamType::Value(t)) => {
+                return ir::Expr::new(ExprKind::Local(name.to_string()), t.clone());
+            }
+            Some(_) => {
+                self.error(
+                    "V3004",
+                    format!("`{name}`是Action或Binding参数，不能作为值使用"),
+                    span,
+                    "",
+                );
+                return ir::Expr::unknown();
+            }
+            None => {}
         }
         if let Some(screen) = sc.screen() {
             if let Some(s) = screen.state.get(name) {
@@ -368,10 +402,8 @@ impl<'a> Checker<'a> {
     fn call(&mut self, sc: &Scope, callee: &ast::Expr, args: &[Arg], span: Span) -> ir::Expr {
         match &callee.kind {
             A::Ident(n) if n == "loc" => return self.loc(sc, args, span),
-            A::Ident(n) if n == "plural" || n == "format" || n == "now" => {
-                self.unsupported(&format!("`{n}()`"), callee.span);
-                return ir::Expr::unknown();
-            }
+            A::Ident(n) if n == "plural" => return self.plural(sc, args, span),
+            A::Ident(n) if n == "format" => return self.format(sc, args, span),
             A::Ident(n) if n == "bind" => {
                 self.error(
                     "V3013",
@@ -651,6 +683,242 @@ impl<'a> Checker<'a> {
         ir::Expr::new(ExprKind::Loc { key, args: ir_args }, Type::String)
     }
 
+    /// `plural("key", count, other: "共{count}项", one: "...")`
+    fn plural(&mut self, sc: &Scope, args: &[Arg], span: Span) -> ir::Expr {
+        if !sc.allow_loc {
+            self.error("V4005", "plural只能在view中使用", span, "");
+            return ir::Expr::unknown();
+        }
+        let key = match args.first() {
+            Some(Arg {
+                label: None,
+                value:
+                    ast::Expr {
+                        kind: A::Str(s, _),
+                        span,
+                    },
+                ..
+            }) => (s.clone(), *span),
+            _ => {
+                self.error(
+                    "V4002",
+                    "plural的第1个参数必须是字符串字面量的key",
+                    span,
+                    "",
+                );
+                return ir::Expr::unknown();
+            }
+        };
+        let (key, key_span) = key;
+        if !valid_loc_key(&key) {
+            self.error("V4002", format!("无效的本地化key`{key}`"), key_span, "");
+        }
+        let Some(Arg {
+            label: None,
+            value: count_expr,
+            ..
+        }) = args.get(1)
+        else {
+            self.error(
+                "V4008",
+                "plural的第2个参数必须是数量",
+                span,
+                "例如`plural(\"cart.items\", items.count, other: \"{count}件\")`",
+            );
+            return ir::Expr::unknown();
+        };
+        let count = self.expr(sc, count_expr, Some(&Type::Int));
+        let mut forms = IndexMap::new();
+        for arg in &args[2..] {
+            let Some(label) = &arg.label else {
+                self.error(
+                    "V4008",
+                    "复数形式必须带类别名称",
+                    arg.span,
+                    "例如`other: \"...\"`",
+                );
+                continue;
+            };
+            if !veyra_ir::PLURAL_CATEGORIES.contains(&label.name.as_str()) {
+                self.diags.push(
+                    Diagnostic::error("V4009", format!("未知的复数类别`{}`", label.name))
+                        .with_label(label.span, "")
+                        .with_note(format!(
+                            "可用类别：{}",
+                            veyra_ir::PLURAL_CATEGORIES.join("、")
+                        )),
+                );
+                continue;
+            }
+            let A::Str(text, _) = &arg.value.kind else {
+                self.error("V4008", "复数形式必须是字符串字面量", arg.value.span, "");
+                continue;
+            };
+            match parse_template(text) {
+                Ok(segs) => {
+                    for seg in segs {
+                        if let Segment::Arg(n) = seg
+                            && n != "count"
+                        {
+                            self.error(
+                                "V4007",
+                                format!("复数文案只能使用`{{count}}`占位符，不能使用`{{{n}}}`"),
+                                arg.value.span,
+                                "",
+                            );
+                        }
+                    }
+                }
+                Err(msg) => self.error("V4004", msg, arg.value.span, ""),
+            }
+            forms.insert(label.name.clone(), text.clone());
+        }
+        let Some(other) = forms.get("other").cloned() else {
+            self.error("V4008", "plural必须提供`other`形式", span, "");
+            return ir::Expr::unknown();
+        };
+        let s = LocString {
+            key: key.clone(),
+            source: other,
+            args: vec![LocArg {
+                name: "count".into(),
+                ty: LocArgType::Int,
+            }],
+            plural: Some(veyra_ir::PluralForms { forms }),
+        };
+        self.record_string(s, key_span);
+        ir::Expr::new(
+            ExprKind::Plural {
+                key,
+                count: Box::new(count),
+            },
+            Type::String,
+        )
+    }
+
+    /// `format(value, .number)`
+    fn format(&mut self, sc: &Scope, args: &[Arg], span: Span) -> ir::Expr {
+        let [
+            Arg {
+                label: None, value, ..
+            },
+            Arg {
+                label: None,
+                value: style,
+                ..
+            },
+        ] = args
+        else {
+            self.error(
+                "V2070",
+                "format需要两个位置参数",
+                span,
+                "例如`format(price, .currency(\"CNY\"))`",
+            );
+            return ir::Expr::unknown();
+        };
+        let v = self.expr(sc, value, None);
+        let (name, sargs, name_span) = match &style.kind {
+            A::ImplicitMember(id) => (id.name.as_str(), &[][..], id.span),
+            A::Call(callee, a) => match &callee.kind {
+                A::ImplicitMember(id) => (id.name.as_str(), a.as_slice(), id.span),
+                _ => ("", &[][..], style.span),
+            },
+            _ => ("", &[][..], style.span),
+        };
+        let date_len = |c: &mut Self| -> Option<ir::DateLength> {
+            match sargs {
+                [] => Some(ir::DateLength::Medium),
+                [
+                    Arg {
+                        label: None,
+                        value:
+                            ast::Expr {
+                                kind: A::ImplicitMember(id),
+                                ..
+                            },
+                        ..
+                    },
+                ] if ir::DateLength::from_name(&id.name).is_some() => {
+                    ir::DateLength::from_name(&id.name)
+                }
+                _ => {
+                    c.error(
+                        "V2071",
+                        "日期样式需要`.short`、`.medium`、`.long`或`.full`",
+                        style.span,
+                        "",
+                    );
+                    None
+                }
+            }
+        };
+        let (fmt, accepts): (Option<ir::FormatStyle>, fn(&Type) -> bool) = match name {
+            "number" => (Some(ir::FormatStyle::Number), Type::is_numeric),
+            "percent" => (Some(ir::FormatStyle::Percent), |t| *t == Type::Double),
+            "currency" => match sargs {
+                [
+                    Arg {
+                        label: None,
+                        value:
+                            ast::Expr {
+                                kind: A::Str(code, _),
+                                ..
+                            },
+                        ..
+                    },
+                ] if code.len() == 3 && code.chars().all(|c| c.is_ascii_uppercase()) => (
+                    Some(ir::FormatStyle::Currency(code.clone())),
+                    Type::is_numeric,
+                ),
+                _ => {
+                    self.error(
+                        "V2071",
+                        "currency需要ISO 4217货币代码",
+                        style.span,
+                        "例如`.currency(\"CNY\")`",
+                    );
+                    (None, Type::is_numeric)
+                }
+            },
+            "date" => (date_len(self).map(ir::FormatStyle::Date), |t| {
+                *t == Type::Date
+            }),
+            "time" => (date_len(self).map(ir::FormatStyle::Time), |t| {
+                *t == Type::Date
+            }),
+            "dateTime" => (date_len(self).map(ir::FormatStyle::DateTime), |t| {
+                *t == Type::Date
+            }),
+            _ => {
+                self.diags.push(
+                    Diagnostic::error("V2071", "无效的格式样式")
+                        .with_label(name_span, "")
+                        .with_note("可用样式：.number、.percent、.currency(\"CNY\")、.date、.time、.dateTime"),
+                );
+                (None, Type::is_numeric)
+            }
+        };
+        let Some(fmt) = fmt else {
+            return ir::Expr::unknown();
+        };
+        if !v.ty.is_unknown() && !accepts(&v.ty) {
+            self.error(
+                "V2072",
+                format!("该格式样式不能用于`{}`", v.ty),
+                value.span,
+                "",
+            );
+        }
+        ir::Expr::new(
+            ExprKind::Format {
+                value: Box::new(v),
+                style: fmt,
+            },
+            Type::String,
+        )
+    }
+
     pub(crate) fn record_string(&mut self, s: LocString, span: Span) {
         if let Some((prev, prev_span)) = self.strings.get(&s.key) {
             if *prev != s {
@@ -678,9 +946,32 @@ impl<'a> Checker<'a> {
             },
             _ => return self.not_action(e.span),
         };
+        if let Some(ty) = sc.component_param(name) {
+            if !matches!(ty, ComponentParamType::Action) {
+                return self.not_action(name_span);
+            }
+            if args.is_some() {
+                self.error(
+                    "V3016",
+                    "Action参数不接受实参",
+                    e.span,
+                    format!("改为`{name}`"),
+                );
+                return None;
+            }
+            return Some(ActionRef::Param(name.to_string()));
+        }
         let Some(info) = screen.and_then(|s| s.actions.get(name)) else {
             if screen.is_some_and(|s| s.state.contains_key(name) || s.computed.contains_key(name)) {
                 return self.not_action(name_span);
+            }
+            if screen.is_some_and(|s| s.effects.contains(name)) {
+                self.diags.push(
+                    Diagnostic::error("V3033", format!("`{name}`是effect，不能由View触发"))
+                        .with_label(name_span, "")
+                        .with_note("effect由ViewModel通过emit发出，View只能分发action"),
+                );
+                return None;
             }
             self.error("V1010", format!("未定义的action`{name}`"), name_span, "");
             return None;
@@ -801,6 +1092,11 @@ impl<'a> Checker<'a> {
                     }
                 }
             }
+            A::Ident(n)
+                if matches!(sc.component_param(n), Some(ComponentParamType::Binding(_))) =>
+            {
+                (n.as_str(), e.span)
+            }
             A::Ident(n) if screen.is_some_and(|s| s.state.contains_key(n)) => {
                 self.diags.push(
                     Diagnostic::error("V3017", "双向绑定需要写成bind(...)")
@@ -819,6 +1115,22 @@ impl<'a> Checker<'a> {
             }
         };
         let (name, span) = target;
+        if let Some(pty) = sc.component_param(name) {
+            return match pty {
+                ComponentParamType::Binding(t) if t == ty => Some(BindingRef::Param {
+                    name: name.to_string(),
+                    ty: t.clone(),
+                }),
+                ComponentParamType::Binding(t) => {
+                    self.mismatch(span, ty, t);
+                    None
+                }
+                _ => {
+                    self.error("V3012", format!("参数`{name}`不是Binding"), span, "");
+                    None
+                }
+            };
+        }
         let Some(screen) = screen else {
             self.error("V1010", format!("未定义的名称`{name}`"), span, "");
             return None;

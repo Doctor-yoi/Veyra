@@ -5,8 +5,8 @@
 
 use veyra_codegen::CodeWriter;
 use veyra_ir::{
-    ActionRef, BindingRef, Builtin, Element, ElementKind, Expr, ExprKind, Modifier, ModifierKind,
-    Value, ViewNode,
+    ActionRef, BindingRef, Builtin, Element, ElementKind, Expr, ExprKind, IosElement, IosModifier,
+    Modifier, ModifierKind, NativeSegment, Value, ViewNode,
 };
 
 use crate::swift::{self, ExprCx, double_literal, plain_string_arg};
@@ -26,6 +26,34 @@ pub(crate) fn nodes(w: &mut CodeWriter, cx: ViewCx, nodes: &[ViewNode]) {
             ViewNode::If { cond, then, else_ } => {
                 w.line(format!("if {} {{", swift::expr(cx.expr, cond)));
                 if_tail(w, cx, then, else_);
+            }
+            ViewNode::Debug { then, else_ } => {
+                if then.is_empty() {
+                    w.line("#if !DEBUG");
+                    self::nodes(w, cx, else_);
+                } else {
+                    w.line("#if DEBUG");
+                    self::nodes(w, cx, then);
+                    if !else_.is_empty() {
+                        w.line("#else");
+                        self::nodes(w, cx, else_);
+                    }
+                }
+                w.line("#endif");
+            }
+            ViewNode::Native(segments) => {
+                let mut code = String::new();
+                for seg in segments {
+                    match seg {
+                        NativeSegment::Text(t) => code.push_str(t),
+                        NativeSegment::Expr(e) => code.push_str(&swift::expr(cx.expr, e)),
+                        NativeSegment::Action(a) => {
+                            code.push_str(&format!("{}.{}", cx.vm, swift::ident(a)))
+                        }
+                        NativeSegment::Callback(c) => code.push_str(&swift::ident(c)),
+                    }
+                }
+                w.line(code);
             }
         }
     }
@@ -110,8 +138,34 @@ fn number(cx: ViewCx, v: Option<&Value>) -> Option<String> {
 }
 
 fn element(w: &mut CodeWriter, cx: ViewCx, el: &Element) {
-    let ElementKind::Builtin(b) = &el.kind else {
-        return;
+    let b = match &el.kind {
+        ElementKind::Builtin(b) => b,
+        ElementKind::Ios(IosElement::ShareLink) => {
+            let text = format!(
+                "ShareLink({}, item: {})",
+                text_arg(cx, el.arg("_")),
+                e(cx, el.arg("item"))
+            );
+            return leaf(w, cx, text, el);
+        }
+        ElementKind::Android(_) => return,
+        ElementKind::Component(name) => {
+            // 按声明顺序传参，与结构体的成员构造器一致
+            let args: Vec<_> = el
+                .args
+                .iter()
+                .map(|(n, v)| {
+                    let value = match v {
+                        Value::Expr(x) => swift::expr(cx.expr, x),
+                        Value::Action(_) => format!("{{ {} }}", action(cx, Some(v))),
+                        Value::Binding(_) => binding(cx, Some(v)),
+                        Value::KeyPath(_) | Value::Token(_) => String::new(),
+                    };
+                    format!("{}: {value}", swift::ident(n))
+                })
+                .collect();
+            return leaf(w, cx, format!("{name}({})", args.join(", ")), el);
+        }
     };
     let arg = |n: &str| el.arg(n);
     match b {
@@ -268,19 +322,28 @@ fn is_stack(el: &Element) -> bool {
 /// 闭包之后的修饰符与右花括号对齐
 fn trailing_modifiers(w: &mut CodeWriter, cx: ViewCx, mods: &[Modifier]) {
     for m in mods {
-        for line in modifier(cx, m) {
+        let lines = modifier(cx, m);
+        if lines.is_empty() {
+            continue;
+        }
+        // 后缀表达式中的#if，需要Swift 5.5及以上
+        match m.debug {
+            Some(true) => w.line("#if DEBUG"),
+            Some(false) => w.line("#if !DEBUG"),
+            None => {}
+        }
+        for line in lines {
             w.line(line);
+        }
+        if m.debug.is_some() {
+            w.line("#endif");
         }
     }
 }
 
 fn modifiers_only(w: &mut CodeWriter, cx: ViewCx, mods: &[Modifier]) {
     w.indent();
-    for m in mods {
-        for line in modifier(cx, m) {
-            w.line(line);
-        }
-    }
+    trailing_modifiers(w, cx, mods);
     w.dedent();
 }
 
@@ -348,5 +411,27 @@ fn modifier(cx: ViewCx, m: &Modifier) -> Vec<String> {
         ModifierKind::AccessibilityLabel => {
             vec![format!(".accessibilityLabel({})", text_arg(cx, arg("_")))]
         }
+        ModifierKind::Ios(m) => {
+            let token = || {
+                arg("_")
+                    .and_then(Value::as_token)
+                    .unwrap_or_default()
+                    .to_string()
+            };
+            match m {
+                IosModifier::GlassEffect => vec![".veyraGlassEffect()".into()],
+                IosModifier::NavigationTitle => {
+                    vec![format!(".navigationTitle({})", text_arg(cx, arg("_")))]
+                }
+                IosModifier::TextInputAutocapitalization => {
+                    vec![format!(".textInputAutocapitalization(.{})", token())]
+                }
+                IosModifier::ListStyle => vec![format!(".listStyle(.{})", token())],
+                IosModifier::ScrollDismissesKeyboard => {
+                    vec![format!(".scrollDismissesKeyboard(.{})", token())]
+                }
+            }
+        }
+        ModifierKind::Android(_) => Vec::new(),
     }
 }

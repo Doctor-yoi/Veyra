@@ -14,7 +14,9 @@
 //! 本地化文案生成类型安全的`L10n`访问器与String Catalog
 
 mod l10n;
+mod preferences;
 mod screen;
+mod storage;
 mod swift;
 mod view;
 
@@ -23,7 +25,7 @@ use std::path::PathBuf;
 use serde::Deserialize;
 use veyra_codegen::{Backend, BackendInput, CodeWriter, GENERATED_NOTICE, OutputFile, camel_case};
 use veyra_diagnostics::{Diagnostic, Diagnostics};
-use veyra_ir::{Platform, Program};
+use veyra_ir::{ComponentParamType, IosModifier, ModifierKind, Platform, Program};
 
 use crate::swift::ident;
 
@@ -34,6 +36,8 @@ pub enum Di {
     /// 构造器注入，依赖从Environment读取
     #[default]
     Manual,
+    /// 通过FactoryKit的`@Injected`注入
+    Factory,
 }
 
 /// `[swiftui]`配置段
@@ -47,6 +51,8 @@ pub struct Options {
     pub di: Di,
     /// String Catalog的表名
     pub table: String,
+    /// FactoryKit的模块名，旧版本为`Factory`
+    pub factory_module: String,
 }
 
 impl Default for Options {
@@ -56,6 +62,7 @@ impl Default for Options {
             user_dir: "ios/ViewModels".into(),
             di: Di::Manual,
             table: "Veyra".into(),
+            factory_module: "FactoryKit".into(),
         }
     }
 }
@@ -98,7 +105,13 @@ impl Backend for SwiftUiBackend {
                 repositories(program),
             ));
         }
-        if program.screens.iter().any(|s| !s.injects.is_empty()) {
+        let has_injects = program.screens.iter().any(|s| !s.injects.is_empty());
+        if has_injects && options.di == Di::Factory {
+            files.push(OutputFile::generated(
+                out.join("Container+Veyra.generated.swift"),
+                factory_container(program, &options),
+            ));
+        } else if has_injects {
             files.push(OutputFile::generated(
                 out.join("VeyraDependencies.generated.swift"),
                 dependencies(program),
@@ -114,6 +127,56 @@ impl Backend for SwiftUiBackend {
             l10n::xcstrings(input.catalog),
         ));
 
+        if !program.entities.is_empty() {
+            let dir = out.join("Storage");
+            for e in &program.entities {
+                files.push(OutputFile::generated(
+                    dir.join(format!("{}Entity.generated.swift", e.name)),
+                    storage::entity(e, program),
+                ));
+            }
+            for st in &program.stores {
+                files.push(OutputFile::generated(
+                    dir.join(format!("{}.generated.swift", st.name)),
+                    storage::store(st, program),
+                ));
+            }
+            files.push(OutputFile::generated(
+                dir.join("VeyraStorage.generated.swift"),
+                storage::support(program),
+            ));
+        }
+        if !program.settings.is_empty() || !program.secures.is_empty() {
+            let dir = out.join("Preferences");
+            for st in &program.settings {
+                files.push(OutputFile::generated(
+                    dir.join(format!("{}.generated.swift", st.name)),
+                    preferences::settings(st),
+                ));
+            }
+            for st in &program.secures {
+                files.push(OutputFile::generated(
+                    dir.join(format!("{}.generated.swift", st.name)),
+                    preferences::secure(st),
+                ));
+            }
+            files.push(OutputFile::generated(
+                dir.join("VeyraPreferences.generated.swift"),
+                preferences::support(program),
+            ));
+        }
+        if program.any_modifier(|m| m.kind == ModifierKind::Ios(IosModifier::GlassEffect)) {
+            files.push(OutputFile::generated(
+                out.join("VeyraPlatform.generated.swift"),
+                platform_support(),
+            ));
+        }
+        if !program.components.is_empty() {
+            files.push(OutputFile::generated(
+                out.join("Components.generated.swift"),
+                components(program),
+            ));
+        }
         for s in &program.screens {
             let dir = out.join("Screens").join(&s.name);
             let file = |suffix: &str| dir.join(format!("{}{suffix}.generated.swift", s.name));
@@ -254,4 +317,111 @@ fn dependencies(program: &Program) -> String {
 /// 字段默认值
 pub(crate) fn default_value(e: &veyra_ir::Expr) -> String {
     swift::expr(swift::ExprCx { state: "" }, e)
+}
+
+fn components(program: &Program) -> String {
+    let mut w = CodeWriter::new("    ");
+    header(&mut w, &["SwiftUI"]);
+    for c in &program.components {
+        w.block(format!("struct {}: View {{", c.name), "}", |w| {
+            for p in &c.params {
+                match &p.ty {
+                    ComponentParamType::Value(t) => {
+                        w.line(format!("let {}: {}", ident(&p.name), swift::ty(t)))
+                    }
+                    ComponentParamType::Action => {
+                        w.line(format!("let {}: () -> Void", ident(&p.name)))
+                    }
+                    ComponentParamType::Binding(t) => {
+                        w.line(format!("@Binding var {}: {}", ident(&p.name), swift::ty(t)))
+                    }
+                }
+            }
+            if !c.params.is_empty() {
+                w.blank();
+            }
+            w.block("var body: some View {", "}", |w| {
+                let cx = view::ViewCx {
+                    expr: swift::ExprCx { state: "" },
+                    vm: "",
+                };
+                view::nodes(w, cx, &c.body);
+            });
+        });
+        w.blank();
+    }
+    w.finish()
+}
+
+/// FactoryKit的注册入口，默认实现需由应用注册
+fn factory_container(program: &Program, options: &Options) -> String {
+    let mut w = CodeWriter::new("    ");
+    header(&mut w, &[options.factory_module.as_str()]);
+    w.line(
+        "/// Register implementations at launch, for example in `AutoRegistering.autoRegister()`",
+    );
+    w.block("extension Container {", "}", |w| {
+        for (i, t) in injected_types(program).iter().enumerate() {
+            if i > 0 {
+                w.blank();
+            }
+            w.block(
+                format!("var {}: Factory<any {t}> {{", dependency_name(t)),
+                "}",
+                |w| {
+                    // settings与secure有默认实现，其余依赖需要应用注册
+                    if program.settings.iter().any(|x| x.name == *t) {
+                        w.line(format!(
+                            "self {{ @MainActor in UserDefaults{t}() }}.singleton"
+                        ));
+                    } else if program.secures.iter().any(|x| x.name == *t) {
+                        w.line(format!("self {{ @MainActor in Keychain{t}() }}.singleton"));
+                    } else {
+                        w.line(format!(
+                            "self {{ @MainActor in fatalError(\"{t} is not registered\") }}"
+                        ));
+                    }
+                },
+            );
+        }
+    });
+    w.finish()
+}
+
+fn injected_types(program: &Program) -> Vec<&str> {
+    let mut types: Vec<&str> = program
+        .screens
+        .iter()
+        .flat_map(|s| s.injects.iter().map(|i| i.ty.as_str()))
+        .collect();
+    types.sort();
+    types.dedup();
+    types
+}
+
+/// 平台修饰符的兼容封装
+fn platform_support() -> String {
+    let mut w = CodeWriter::new("    ");
+    header(&mut w, &["SwiftUI"]);
+    w.block("extension View {", "}", |w| {
+        w.line(
+            "/// Applies Liquid Glass on iOS 26 and later, earlier systems keep the view unchanged",
+        );
+        w.line("@ViewBuilder");
+        w.block("func veyraGlassEffect() -> some View {", "}", |w| {
+            // 旧版Xcode的SDK中没有glassEffect，按编译器版本区分
+            w.line("#if compiler(>=6.2)");
+            w.block("if #available(iOS 26.0, *) {", "} else {", |w| {
+                w.line("glassEffect()")
+            });
+            w.indent();
+            w.line("self");
+            w.dedent();
+            w.line("}");
+            w.line("#else");
+            w.line("self");
+            w.line("#endif");
+        });
+    });
+    w.finish()
 }

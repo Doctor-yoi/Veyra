@@ -1,0 +1,9 @@
+---
+source: crates/veyra-backend-swiftui/tests/generate.rs
+expression: f.contents
+---
+{
+  "sourceLanguage": "en",
+  "strings": {},
+  "version": "1.0"
+}

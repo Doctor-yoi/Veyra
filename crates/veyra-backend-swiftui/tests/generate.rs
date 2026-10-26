@@ -13,7 +13,7 @@ fn generates_schedule() {
     assert!(parsed.diagnostics.is_empty());
     let analysis = analyze(&[parsed.file], &Target::new(Platform::Ios));
     assert!(
-        analysis.diagnostics.is_empty(),
+        !analysis.diagnostics.has_errors(),
         "{:?}",
         analysis.diagnostics
     );
@@ -25,6 +25,12 @@ fn generates_schedule() {
             let mut translations = indexmap::IndexMap::new();
             if s.key == "schedule.title" {
                 translations.insert("en".to_string(), Translation::Text("My Schedule".into()));
+            }
+            if s.key == "schedule.items" {
+                let mut forms = indexmap::IndexMap::new();
+                forms.insert("one".to_string(), "{count} course".to_string());
+                forms.insert("other".to_string(), "{count} courses".to_string());
+                translations.insert("en".to_string(), Translation::Plural(forms));
             }
             if s.key == "schedule.count" {
                 translations.insert(
@@ -61,5 +67,69 @@ fn generates_schedule() {
     for f in files {
         let name = f.path.to_string_lossy().replace('/', "__");
         insta::assert_snapshot!(name, f.contents);
+    }
+}
+
+#[test]
+fn generates_with_di_option() {
+    let src = include_str!("fixtures.vey");
+    let parsed = veyra_syntax::parse(Default::default(), src);
+    let analysis = analyze(&[parsed.file], &Target::new(Platform::Ios));
+    let catalog = Catalog {
+        source_locale: "zh-Hans".into(),
+        target_locales: Vec::new(),
+        entries: Vec::new(),
+    };
+    let options: toml::Table = toml::from_str("di = \"factory\"").unwrap();
+    let files = SwiftUiBackend
+        .generate(&BackendInput {
+            program: &analysis.program,
+            catalog: &catalog,
+            options: &options,
+        })
+        .unwrap();
+    let keep = ["Container", "Root", "ViewModels"];
+    for f in files {
+        let name = f.path.to_string_lossy().replace('/', "__");
+        if keep.iter().any(|k| name.contains(k)) {
+            insta::assert_snapshot!(format!("di__{name}"), f.contents);
+        }
+    }
+}
+
+#[test]
+fn generates_storage() {
+    let src = include_str!("storage.vey");
+    let parsed = veyra_syntax::parse(Default::default(), src);
+    assert!(parsed.diagnostics.is_empty());
+    let analysis = analyze(&[parsed.file], &Target::new(Platform::Ios));
+    assert!(
+        !analysis.diagnostics.has_errors(),
+        "{:?}",
+        analysis.diagnostics
+    );
+    let catalog = Catalog {
+        source_locale: "en".into(),
+        target_locales: Vec::new(),
+        entries: Vec::new(),
+    };
+    let options: toml::Table = toml::from_str("").unwrap();
+    let files = SwiftUiBackend
+        .generate(&BackendInput {
+            program: &analysis.program,
+            catalog: &catalog,
+            options: &options,
+        })
+        .unwrap();
+    if let Ok(dir) = std::env::var("VEYRA_DUMP_STORAGE") {
+        for f in &files {
+            let path = std::path::Path::new(&dir).join(&f.path);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, &f.contents).unwrap();
+        }
+    }
+    for f in files {
+        let name = f.path.to_string_lossy().replace('/', "__");
+        insta::assert_snapshot!(format!("storage__{name}"), f.contents);
     }
 }

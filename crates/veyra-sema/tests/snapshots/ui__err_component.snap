@@ -1,0 +1,91 @@
+---
+source: crates/veyra-sema/tests/ui.rs
+expression: out
+---
+error[V3004]: `onTap`是Action或Binding参数，不能作为值使用
+ --> err_component.vey:5:10
+  |
+5 |     Text(onTap)
+  |          ^^^^^
+
+error[V1010]: 未定义的名称`title`
+ --> err_component.vey:6:10
+  |
+6 |     Text(title)
+  |          ^^^^^
+
+error[V3012]: 参数`label`不是Binding
+ --> err_component.vey:8:30
+  |
+8 |     Toggle(label, isOn: bind(label))
+  |                              ^^^^^
+
+error[V3016]: Action参数不接受实参
+ --> err_component.vey:9:27
+  |
+9 |     Button(label, action: onTap(1))
+  |                           ^^^^^^^^ 改为`onTap`
+
+error[V2042]: `.font`不能用于`Row`
+  --> err_component.vey:11:4
+   |
+11 |   .font(.title)
+   |    ^^^^
+   |
+   = note: 可用于：Text
+
+error[V3040]: 组件`Loop`递归引用了自身
+  --> err_component.vey:14:11
+   |
+14 | component Loop(n: Int) {
+   |           ^^^^
+   |
+   = note: 递归的视图结构请用List或ForEach表达
+
+error[V2032]: 组件`Badge`缺少参数`label`
+  --> err_component.vey:25:7
+   |
+25 |       Badge("x", count: 1, onTap: title, value: bind(on))
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[V2073]: 自定义组件的参数必须带名称
+  --> err_component.vey:25:13
+   |
+25 |       Badge("x", count: 1, onTap: title, value: bind(on))
+   |             ^^^
+   |
+   = note: 参数：label、count、onTap、value
+
+error[V3011]: 此处需要action
+  --> err_component.vey:25:35
+   |
+25 |       Badge("x", count: 1, onTap: title, value: bind(on))
+   |                                   ^^^^^
+   |
+   = note: 例如`refresh`或`openCourse(course.id)`
+
+error[V2032]: 组件`Badge`缺少参数`value`
+  --> err_component.vey:26:7
+   |
+26 |       Badge(label: "x", count: "1", onTap: refresh, extra: 1)
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[V2001]: 类型不匹配：期望`Int`，实际为`String`
+  --> err_component.vey:26:32
+   |
+26 |       Badge(label: "x", count: "1", onTap: refresh, extra: 1)
+   |                                ^^^ 类型为`String`
+
+error[V2030]: 组件`Badge`没有参数`extra`
+  --> err_component.vey:26:53
+   |
+26 |       Badge(label: "x", count: "1", onTap: refresh, extra: 1)
+   |                                                     ^^^^^
+
+error[V2034]: 组件`Badge`不接受子组件
+  --> err_component.vey:27:68
+   |
+27 |       Badge(label: "x", count: 1, onTap: refresh, value: bind(on)) {
+   |                                                                    ^
+
+error: 共13个错误，0个警告

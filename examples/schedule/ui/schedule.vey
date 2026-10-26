@@ -1,5 +1,17 @@
 // 课表页：搜索、刷新与课程列表
 
+import "models.vey"
+
+component CourseRow(course: Course, onTap: Action) {
+  Row(spacing: 8) {
+    Text(course.name).font(.headline)
+    Spacer()
+    Text(format(course.credits, .number))
+    Text(course.teacher ?? "-").foreground(.secondary)
+  }
+  .onTap(onTap)
+}
+
 screen Schedule {
   inject courses: CourseRepository
 
@@ -23,16 +35,23 @@ screen Schedule {
     openCourse(id: String)
   }
 
+  effects {
+    showCourse(id: String)
+  }
+
+  lifecycle {
+    onAppear: refresh
+  }
+
   view {
     Column(spacing: 12, alignment: .leading) {
       Text(loc("schedule.title", "我的课表")).font(.largeTitle)
-      Text(loc("schedule.count", "共{count}门课程", count: count)).foreground(.secondary)
+      Text(plural("schedule.count", count, other: "共{count}门课程")).foreground(.secondary)
       TextField(loc("schedule.search", "搜索课程"), text: bind(query))
       #if ios
       Toggle(loc("schedule.compact", "紧凑模式"), isOn: bind(compact))
       #endif
-      Button(loc("schedule.refresh", "刷新"), action: refresh)
-        .disabled(!canRefresh)
+      Button(loc("schedule.refresh", "刷新"), action: refresh).disabled(!canRefresh)
       if isRefreshing {
         Progress()
       } else if items.isEmpty {
@@ -40,12 +59,7 @@ screen Schedule {
         Text(loc("schedule.empty", "暂无课程")).foreground(.secondary)
       } else {
         List(items, key: .id) { course in
-          Row(spacing: 8) {
-            Text(course.name).font(.headline)
-            Spacer()
-            Text(course.teacher ?? "-").foreground(.secondary)
-          }
-          .onTap(openCourse(course.id))
+          CourseRow(course: course, onTap: openCourse(course.id))
         }
       }
       #if premium

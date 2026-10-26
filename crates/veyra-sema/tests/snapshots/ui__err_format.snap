@@ -1,0 +1,75 @@
+---
+source: crates/veyra-sema/tests/ui.rs
+expression: out
+---
+error[V4005]: plural只能在view中使用
+ --> err_format.vey:9:21
+  |
+9 |     label: String = plural("cart.items", count, other: "{count}件")
+  |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[V4008]: plural必须提供`other`形式
+  --> err_format.vey:14:12
+   |
+14 |       Text(plural("cart.items", count, one: "{count}件"))
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[V4007]: 复数文案只能使用`{count}`占位符，不能使用`{name}`
+  --> err_format.vey:15:47
+   |
+15 |       Text(plural("cart.total", count, other: "{count}件{name}", few: "x"))
+   |                                               ^^^^^^^^^^^^^^^^^
+
+error[V2001]: 类型不匹配：期望`Int`，实际为`String`
+  --> err_format.vey:16:32
+   |
+16 |       Text(plural("cart.size", name, other: "{count}"))
+   |                                ^^^^ 类型为`String`
+
+error[V4009]: 未知的复数类别`dual`
+  --> err_format.vey:17:56
+   |
+17 |       Text(plural("cart.bad", count, other: "{count}", dual: "x"))
+   |                                                        ^^^^
+   |
+   = note: 可用类别：zero、one、two、few、many、other
+
+error[V2072]: 该格式样式不能用于`String`
+  --> err_format.vey:18:19
+   |
+18 |       Text(format(name, .number))
+   |                   ^^^^
+
+error[V2072]: 该格式样式不能用于`Int`
+  --> err_format.vey:19:19
+   |
+19 |       Text(format(count, .percent))
+   |                   ^^^^^
+
+error[V2071]: currency需要ISO 4217货币代码
+  --> err_format.vey:20:26
+   |
+20 |       Text(format(price, .currency("rmb")))
+   |                          ^^^^^^^^^^^^^^^^ 例如`.currency("CNY")`
+
+error[V2071]: 日期样式需要`.short`、`.medium`、`.long`或`.full`
+  --> err_format.vey:21:26
+   |
+21 |       Text(format(price, .date(.tiny)))
+   |                          ^^^^^^^^^^^^
+
+error[V2071]: 无效的格式样式
+  --> err_format.vey:22:27
+   |
+22 |       Text(format(price, .weird))
+   |                           ^^^^^
+   |
+   = note: 可用样式：.number、.percent、.currency("CNY")、.date、.time、.dateTime
+
+error[V2070]: format需要两个位置参数
+  --> err_format.vey:23:12
+   |
+23 |       Text(format(price))
+   |            ^^^^^^^^^^^^^ 例如`format(price, .currency("CNY"))`
+
+error: 共11个错误，0个警告

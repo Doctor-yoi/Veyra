@@ -39,6 +39,41 @@ expression: f.contents
         }
       }
     },
+    "schedule.items": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld门课"
+                }
+              }
+            }
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld course"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld courses"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "schedule.notify": {
       "extractionState": "manual",
       "localizations": {
@@ -86,6 +121,23 @@ expression: f.contents
           "stringUnit": {
             "state": "new",
             "value": "搜索课程"
+          }
+        }
+      }
+    },
+    "schedule.share": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "分享"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "分享"
           }
         }
       }

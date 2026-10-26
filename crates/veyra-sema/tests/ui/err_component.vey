@@ -1,0 +1,35 @@
+// 自定义组件
+component Badge(label: String, count: Int, onTap: Action, value: Binding<Bool>) {
+  Row {
+    Text(label)
+    Text(onTap)
+    Text(title)
+    Toggle(label, isOn: value)
+    Toggle(label, isOn: bind(label))
+    Button(label, action: onTap(1))
+  }
+  .font(.title)
+}
+
+component Loop(n: Int) {
+  Loop(n: n)
+}
+
+screen Home {
+  state {
+    title: String = ""
+    on: Bool = false @writable
+  }
+  view {
+    Column {
+      Badge("x", count: 1, onTap: title, value: bind(on))
+      Badge(label: "x", count: "1", onTap: refresh, extra: 1)
+      Badge(label: "x", count: 1, onTap: refresh, value: bind(on)) {
+        Text("child")
+      }
+    }
+  }
+  actions {
+    refresh()
+  }
+}
