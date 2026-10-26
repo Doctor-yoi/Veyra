@@ -46,6 +46,8 @@ Veyra使用Rust编写，需要Rust 1.88或更高版本。
 cargo install --path crates/veyra-cli
 ```
 
+VS Code的语法高亮扩展位于[editors/vscode](editors/vscode)。
+
 ## 快速开始
 
 ```bash
