@@ -5,7 +5,7 @@
 
 use indexmap::IndexMap;
 use veyra_diagnostics::{Diagnostic, Span};
-use veyra_ir::{self as ir, Builtin, ElementKind, ModifierKind, Type, Value};
+use veyra_ir::{self as ir, Builtin, ComponentParamType, ElementKind, ModifierKind, Type, Value};
 use veyra_syntax::ast::{self, Arg, ExprKind as A};
 
 use crate::Checker;
@@ -55,6 +55,9 @@ impl<'a> Checker<'a> {
             return None;
         }
         let name = &el.path[0];
+        if self.components.contains_key(&name.name) {
+            return self.component_instance(sc, el);
+        }
         let Some(builtin) = Builtin::from_name(&name.name) else {
             self.diags.push(
                 Diagnostic::error("V1011", format!("未知的组件`{}`", name.name))
@@ -142,12 +145,99 @@ impl<'a> Checker<'a> {
             (None, Children::None) => Vec::new(),
         };
 
-        let modifiers = self.modifiers(sc, &el.modifiers, builtin);
+        let modifiers = self.modifiers(sc, &el.modifiers, Some(builtin));
         Some(ir::Element {
             kind: ElementKind::Builtin(builtin),
             args,
             children,
             item,
+            modifiers,
+        })
+    }
+
+    /// 自定义组件的实例，参数一律按名称传递
+    fn component_instance(&mut self, sc: &mut Scope, el: &'a ast::Element) -> Option<ir::Element> {
+        let name = &el.path[0];
+        let params = self.components.get(&name.name).cloned().unwrap_or_default();
+        if let Some(c) = &el.closure {
+            self.error(
+                "V2034",
+                format!("组件`{}`不接受子组件", name.name),
+                c.span,
+                "",
+            );
+        }
+        let mut args: IndexMap<String, Value> = IndexMap::new();
+        for arg in &el.args {
+            let Some(label) = &arg.label else {
+                self.diags.push(
+                    Diagnostic::error("V2073", "自定义组件的参数必须带名称")
+                        .with_label(arg.span, "")
+                        .with_note(format!(
+                            "参数：{}",
+                            params
+                                .iter()
+                                .map(|p| p.name.as_str())
+                                .collect::<Vec<_>>()
+                                .join("、")
+                        )),
+                );
+                continue;
+            };
+            let Some(p) = params.iter().find(|p| p.name == label.name) else {
+                self.error(
+                    "V2030",
+                    format!("组件`{}`没有参数`{}`", name.name, label.name),
+                    label.span,
+                    "",
+                );
+                continue;
+            };
+            if args.contains_key(&p.name) {
+                self.error("V2031", format!("参数`{}`重复", p.name), arg.span, "");
+                continue;
+            }
+            let kind = match &p.ty {
+                ComponentParamType::Value(t) if *t == Type::Double => ArgKind::Number,
+                ComponentParamType::Value(t) => ArgKind::Expr(t.clone()),
+                ComponentParamType::Action => ArgKind::Action,
+                ComponentParamType::Binding(t) => ArgKind::Binding(t.clone()),
+            };
+            let value = self.arg_value(sc, &kind, &arg.value);
+            args.insert(p.name.clone(), value);
+        }
+        let mut ordered = IndexMap::new();
+        for p in &params {
+            match args.shift_remove(&p.name) {
+                Some(v) => {
+                    ordered.insert(p.name.clone(), v);
+                }
+                None if matches!(&p.ty, ComponentParamType::Value(t) if t.is_optional()) => {
+                    ordered.insert(
+                        p.name.clone(),
+                        Value::Expr(ir::Expr::new(
+                            ir::ExprKind::Nil,
+                            match &p.ty {
+                                ComponentParamType::Value(t) => t.clone(),
+                                _ => Type::Unknown,
+                            },
+                        )),
+                    );
+                }
+                None => self.error(
+                    "V2032",
+                    format!("组件`{}`缺少参数`{}`", name.name, p.name),
+                    el.span,
+                    "",
+                ),
+            }
+        }
+        let modifiers = self.modifiers(sc, &el.modifiers, None);
+        Some(ir::Element {
+            kind: ElementKind::Component(name.name.clone()),
+            args: ordered,
+            children: Vec::new(),
+            item: None,
             modifiers,
         })
     }
@@ -183,7 +273,7 @@ impl<'a> Checker<'a> {
         &mut self,
         sc: &mut Scope,
         nodes: &'a [ast::Node<ast::Modifier>],
-        owner: Builtin,
+        owner: Option<Builtin>,
     ) -> Vec<ir::Modifier> {
         let pruned = self.cfg.prune(nodes, &mut self.diags);
         let mut out = Vec::new();
@@ -215,22 +305,20 @@ impl<'a> Checker<'a> {
             };
             let spec = catalog::modifier(kind);
             if let Some(allowed) = spec.applies_to
-                && !allowed.contains(&owner)
+                && !owner.is_some_and(|o| allowed.contains(&o))
             {
+                let owner = owner.map(|o| o.name()).unwrap_or("自定义组件");
                 self.diags.push(
-                    Diagnostic::error(
-                        "V2042",
-                        format!("`.{}`不能用于`{}`", name.name, owner.name()),
-                    )
-                    .with_label(name.span, "")
-                    .with_note(format!(
-                        "可用于：{}",
-                        allowed
-                            .iter()
-                            .map(|b| b.name())
-                            .collect::<Vec<_>>()
-                            .join("、")
-                    )),
+                    Diagnostic::error("V2042", format!("`.{}`不能用于`{owner}`", name.name))
+                        .with_label(name.span, "")
+                        .with_note(format!(
+                            "可用于：{}",
+                            allowed
+                                .iter()
+                                .map(|b| b.name())
+                                .collect::<Vec<_>>()
+                                .join("、")
+                        )),
                 );
                 continue;
             }
