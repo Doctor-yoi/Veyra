@@ -1,11 +1,19 @@
 package com.example.schedule.data
 
 import android.content.Context
+import com.example.schedule.ui.Account
+import com.example.schedule.ui.AppPreferences
 import com.example.schedule.ui.Course
 import android.content.Context
+import com.example.schedule.ui.Account
+import com.example.schedule.ui.AppPreferences
 import com.example.schedule.ui.CourseKind
 import android.content.Context
+import com.example.schedule.ui.Account
+import com.example.schedule.ui.AppPreferences
 import com.example.schedule.ui.CourseRepository
+import com.example.schedule.ui.DataStoreAppPreferences
+import com.example.schedule.ui.KeystoreAccount
 import com.example.schedule.ui.NoteStore
 import com.example.schedule.ui.VeyraDatabase
 import com.example.schedule.ui.VeyraStores
@@ -29,4 +37,6 @@ class AppDependencies(context: Context) : VeyraDependencies {
 
     override val courseRepository: CourseRepository = InMemoryCourseRepository()
     override val noteStore: NoteStore = stores.noteStore
+    override val appPreferences: AppPreferences = DataStoreAppPreferences(context)
+    override val account: Account = KeystoreAccount(context)
 }

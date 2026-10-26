@@ -75,6 +75,7 @@ View不能调用任意函数、修改状态或访问注入的依赖，有副作�
 | `enum`、`model` | 各层共享的值类型 |
 | `repository` | 数据访问契约，由各平台原生实现 |
 | `entity`、`store` | 持久化数据及其数据访问对象 |
+| `settings`、`secure` | 简单配置与安全凭证 |
 | `component` | 不含业务状态的可复用视图，参数可以是值、`Action`与`Binding<T>` |
 | `screen` | 页面，包含`inject`、`state`、`computed`、`actions`、`effects`、`lifecycle`与`view` |
 
@@ -99,6 +100,8 @@ store NoteStore for Note {
 ```
 
 每个store自动提供`all`、`find`、`save`与`delete`，以及声明的查询。查询条件支持比较运算、`contains`、与`nil`比较、Bool字段、`&&`、`||`与`!`，在iOS上编译为`#Predicate`，在Android上编译为SQL。返回`Stream<List<T>>`时持续观察变化，返回`List<T>`或`T?`时只读取一次。View与ViewModel只接触值类型`Note`，不会拿到持久化类型`NoteEntity`。iOS上`VeyraStorage`与`VeyraStores`负责创建SwiftData容器，Android上对应`VeyraDatabase`与`VeyraStores`。Android的表结构变化时，递增`[compose]`中的`database_version`，并在生成的`VeyraMigrations.kt`中添加迁移。
+
+`settings`生成基于`UserDefaults`与DataStore的类型安全配置，每个字段都需要默认值。`secure`生成凭证存储，iOS使用Keychain，Android使用Android Keystore密钥加密后保存，不依赖第三方库。两者与repository、store一样注入到ViewModel中。
 
 条件编译用于选择平台专属内容。平台条件与`[flags]`中声明的自定义flag在编译期确定，每个平台单独做类型检查：
 
