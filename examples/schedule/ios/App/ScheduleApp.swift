@@ -38,21 +38,59 @@ final class AppDependencies: VeyraDependencies {
     }
 }
 
+/// 课程详情，由ScheduleRoot发出的showCourse事件导航到这里
+struct CourseDetailView: View {
+    let id: String
+    let repository: any CourseRepository
+    @State private var course: Course?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let course {
+                Text(course.name).font(.largeTitle)
+                Text(course.teacher ?? "-").foregroundStyle(.secondary)
+                Text(course.credits.formatted(.number))
+            } else {
+                ProgressView()
+            }
+        }
+        .padding()
+        .veyraGlassEffect()
+        .task {
+            course = try? await repository.getCourses().first { $0.id == id }
+        }
+    }
+}
+
 @main
 struct ScheduleApp: App {
     private let dependencies = AppDependencies()
+    @State private var path: [String] = []
 
     var body: some Scene {
         WindowGroup {
             TabView {
-                ScheduleRoot()
-                    .tabItem { Label(L10n.scheduleTitle, systemImage: "calendar") }
+                NavigationStack(path: $path) {
+                    ScheduleRoot(onEffect: handle)
+                        .navigationDestination(for: String.self) { id in
+                            CourseDetailView(id: id, repository: dependencies.courseRepository)
+                        }
+                }
+                .tabItem { Label(L10n.scheduleTitle, systemImage: "calendar") }
                 NotesRoot()
                     .tabItem { Label(L10n.notesAdd, systemImage: "note.text") }
                 SettingsRoot()
                     .tabItem { Label(L10n.settingsTitle, systemImage: "gear") }
             }
             .veyraDependencies(dependencies)
+        }
+    }
+
+    /// ScheduleViewModel发出的一次性事件
+    private func handle(_ effect: ScheduleEffect) {
+        switch effect {
+        case .showCourse(let id):
+            path.append(id)
         }
     }
 }
