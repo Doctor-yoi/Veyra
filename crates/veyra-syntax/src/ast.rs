@@ -15,7 +15,20 @@ pub struct Ident {
 #[derive(Clone, Debug, PartialEq)]
 pub struct File {
     pub id: FileId,
+    /// 相对于项目根目录的路径，由调用方填写，用于诊断中的import建议
+    pub path: String,
+    pub imports: Vec<Import>,
     pub items: Vec<Node<Item>>,
+}
+
+/// `import "path.vey"`
+#[derive(Clone, Debug, PartialEq)]
+pub struct Import {
+    /// 相对于当前文件的路径
+    pub path: String,
+    pub span: Span,
+    /// 解析后的文件，由调用方填写
+    pub resolved: Option<FileId>,
 }
 
 /// 可被`#if`包裹的节点

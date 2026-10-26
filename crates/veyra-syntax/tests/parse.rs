@@ -6,6 +6,12 @@ use veyra_syntax::ast::*;
 use veyra_syntax::parse;
 
 const SCHEDULE: &str = r#"
+import "models.vey"
+import (
+  "stores/course.vey"
+  "../shared/theme.vey"
+)
+
 // 课程类型
 enum CourseKind { lecture, lab }
 
@@ -105,6 +111,16 @@ fn parses_full_example() {
     let parsed = parse(Default::default(), SCHEDULE);
     assert!(parsed.diagnostics.is_empty(), "{}", render(SCHEDULE));
     assert_eq!(parsed.file.items.len(), 6);
+    let imports: Vec<_> = parsed
+        .file
+        .imports
+        .iter()
+        .map(|i| i.path.as_str())
+        .collect();
+    assert_eq!(
+        imports,
+        ["models.vey", "stores/course.vey", "../shared/theme.vey"]
+    );
     assert_eq!(parsed.comments.len(), 1);
 
     let Node::Item(Item::Screen(screen)) = &parsed.file.items[5] else {
@@ -160,4 +176,11 @@ model M { a: Int }
 #[test]
 fn rejects_unknown_item() {
     insta::assert_snapshot!(render("widget Foo {}\nenum E { a b }\n#endif\n"));
+}
+
+#[test]
+fn rejects_late_import() {
+    insta::assert_snapshot!(render(
+        "model A { a: Int }\nimport \"b.vey\"\nmodel C { c: Int }\n"
+    ));
 }

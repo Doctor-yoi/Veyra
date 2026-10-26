@@ -195,10 +195,13 @@ impl<'a> Parser<'a> {
                             if self.diags.error_count() == errors {
                                 self.error_here("声明");
                             }
+                            // 已经停在新的一行时无需再跳过
                             if self.pos == before {
                                 self.bump();
+                                self.recover(end);
+                            } else if !self.peek().newline_before {
+                                self.recover(end);
                             }
-                            self.recover(end);
                         }
                     }
                 }
@@ -316,8 +319,61 @@ impl<'a> Parser<'a> {
 
     // ---- 顶层声明 ----
 
+    /// `import "a.vey"`或`import ( "a.vey" "b.vey" )`
+    fn imports(&mut self) -> Vec<Import> {
+        let mut out = Vec::new();
+        while self.at_kw("import") {
+            self.bump();
+            if self.eat(T::LParen) {
+                while self.at(T::Str) {
+                    if let Some(i) = self.import_path() {
+                        out.push(i);
+                    }
+                    self.eat(T::Comma);
+                }
+                if self.expect(T::RParen).is_none() {
+                    self.recover(None);
+                }
+            } else if let Some(i) = self.import_path() {
+                out.push(i);
+            } else {
+                self.recover(None);
+            }
+        }
+        out
+    }
+
+    fn import_path(&mut self) -> Option<Import> {
+        let t = self.expect(T::Str)?;
+        match unescape(self.text(t)) {
+            Ok(path) => Some(Import {
+                path,
+                span: t.span,
+                resolved: None,
+            }),
+            Err(msg) => {
+                self.diags
+                    .push(Diagnostic::error("V0021", msg).with_label(t.span, ""));
+                None
+            }
+        }
+    }
+
     pub(crate) fn file(&mut self) -> File {
-        let mut f = |p: &mut Parser<'a>| p.item();
+        let imports = self.imports();
+        let mut f = |p: &mut Parser<'a>| {
+            if p.at_kw("import") {
+                let span = p.peek().span;
+                p.diags.push(
+                    Diagnostic::error("V0016", "import必须位于文件开头")
+                        .with_label(span, "")
+                        .with_note("把所有import移到声明之前"),
+                );
+                p.imports();
+                return None;
+            }
+            p.item()
+        };
         let items = self.nodes(None, &mut f);
         if !self.at(T::Eof) {
             let t = self.peek();
@@ -328,6 +384,8 @@ impl<'a> Parser<'a> {
         }
         File {
             id: self.file,
+            path: String::new(),
+            imports,
             items,
         }
     }
