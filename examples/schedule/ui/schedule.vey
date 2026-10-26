@@ -9,6 +9,10 @@ component CourseRow(course: Course, onTap: Action) {
     Text(format(course.credits, .number))
     Text(course.teacher ?? "-").foreground(.secondary)
   }
+  .padding(12)
+  #if ios
+  .ios.glassEffect()
+  #endif
   .onTap(onTap)
 }
 
@@ -48,17 +52,28 @@ screen Schedule {
       Text(loc("schedule.title", "我的课表")).font(.largeTitle)
       Text(plural("schedule.count", count, other: "共{count}门课程")).foreground(.secondary)
       TextField(loc("schedule.search", "搜索课程"), text: bind(query))
+        .padding(12)
+        #if ios
+        .ios.glassEffect()
+        #endif
       #if ios
       Toggle(loc("schedule.compact", "紧凑模式"), isOn: bind(compact))
+        .padding(12)
+        .ios.glassEffect()
       #endif
-      Button(loc("schedule.refresh", "刷新"), action: refresh).disabled(!canRefresh)
+      Button(loc("schedule.refresh", "刷新"), action: refresh)
+        .disabled(!canRefresh)
+        .padding(12)
+        #if ios
+        .ios.glassEffect()
+        #endif
       if isRefreshing {
         Progress()
       } else if items.isEmpty {
         Text(errorMessage ?? "").foreground(.red)
         Text(loc("schedule.empty", "暂无课程")).foreground(.secondary)
       } else {
-        List(items, key: .id) { course in
+        ForEach(items, key: .id) { course in
           CourseRow(course: course, onTap: openCourse(course.id))
         }
       }
