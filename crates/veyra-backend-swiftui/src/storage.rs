@@ -388,7 +388,8 @@ pub(crate) fn support(program: &Program) -> String {
     w.line("/// Model container that contains every Veyra entity");
     w.block("enum VeyraStorage {", "}", |w| {
         let types: Vec<_> = program.entities.iter().map(|e| format!("{}Entity.self", e.name)).collect();
-        w.line(format!("static let schema = Schema([{}])", types.join(", ")));
+        // Schema在较旧的SDK中不是Sendable，使用计算属性
+        w.line(format!("static var schema: Schema {{ Schema([{}]) }}", types.join(", ")));
         w.blank();
         w.block("static func makeContainer(inMemory: Bool = false) throws -> ModelContainer {", "}", |w| {
             w.line("let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory)");

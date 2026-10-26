@@ -9,7 +9,7 @@ import SwiftData
 
 /// Model container that contains every Veyra entity
 enum VeyraStorage {
-    static let schema = Schema([TodoEntity.self])
+    static var schema: Schema { Schema([TodoEntity.self]) }
 
     static func makeContainer(inMemory: Bool = false) throws -> ModelContainer {
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory)
