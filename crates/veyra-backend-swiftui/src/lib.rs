@@ -25,7 +25,7 @@ use std::path::PathBuf;
 use serde::Deserialize;
 use veyra_codegen::{Backend, BackendInput, CodeWriter, GENERATED_NOTICE, OutputFile, camel_case};
 use veyra_diagnostics::{Diagnostic, Diagnostics};
-use veyra_ir::{ComponentParamType, Platform, Program};
+use veyra_ir::{ComponentParamType, IosModifier, ModifierKind, Platform, Program};
 
 use crate::swift::ident;
 
@@ -163,6 +163,12 @@ impl Backend for SwiftUiBackend {
             files.push(OutputFile::generated(
                 dir.join("VeyraPreferences.generated.swift"),
                 preferences::support(program),
+            ));
+        }
+        if program.any_modifier(|m| m.kind == ModifierKind::Ios(IosModifier::GlassEffect)) {
+            files.push(OutputFile::generated(
+                out.join("VeyraPlatform.generated.swift"),
+                platform_support(),
             ));
         }
         if !program.components.is_empty() {
@@ -391,4 +397,26 @@ fn injected_types(program: &Program) -> Vec<&str> {
     types.sort();
     types.dedup();
     types
+}
+
+/// 平台修饰符的兼容封装
+fn platform_support() -> String {
+    let mut w = CodeWriter::new("    ");
+    header(&mut w, &["SwiftUI"]);
+    w.block("extension View {", "}", |w| {
+        w.line(
+            "/// Applies Liquid Glass on iOS 26 and later, earlier systems keep the view unchanged",
+        );
+        w.line("@ViewBuilder");
+        w.block("func veyraGlassEffect() -> some View {", "}", |w| {
+            w.block("if #available(iOS 26.0, *) {", "} else {", |w| {
+                w.line("glassEffect()")
+            });
+            w.indent();
+            w.line("self");
+            w.dedent();
+            w.line("}");
+        });
+    });
+    w.finish()
 }

@@ -19,6 +19,20 @@ struct ScheduleView<ViewModel: ScheduleViewModelContract>: View {
                     .foregroundStyle(.secondary)
                 TextField(L10n.scheduleSearch, text: Binding(get: { viewModel.state.query }, set: { viewModel.setQuery($0) }))
                 SearchBar(text: Binding(get: { viewModel.state.query }, set: { viewModel.setQuery($0) }), placeholder: "搜索")
+                ShareLink(L10n.scheduleShare, item: viewModel.state.query)
+                Text(verbatim: viewModel.state.query).monospaced()
+                Button("Native") { Task { await viewModel.refresh() } }
+                #if DEBUG
+                Text(verbatim: "debug build")
+                #else
+                Text(verbatim: "release build")
+                #endif
+                Text(verbatim: "tag")
+                    .veyraGlassEffect()
+                    #if DEBUG
+                    .padding(4.0)
+                    #endif
+                    .background(Color.blue)
                 SecureField(String("密码"), text: Binding(get: { viewModel.state.password }, set: { viewModel.setPassword($0) }))
                 Toggle(L10n.scheduleNotify, isOn: Binding(get: { viewModel.state.notify }, set: { viewModel.setNotify($0) }))
                 Slider(value: Binding(get: { viewModel.state.volume }, set: { viewModel.setVolume($0) }), in: 0.0...1.0)

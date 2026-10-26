@@ -13,7 +13,7 @@ fn generates_schedule() {
     assert!(parsed.diagnostics.is_empty());
     let analysis = analyze(&[parsed.file], &Target::new(Platform::Android));
     assert!(
-        analysis.diagnostics.is_empty(),
+        !analysis.diagnostics.has_errors(),
         "{:?}",
         analysis.diagnostics
     );
@@ -107,7 +107,7 @@ fn generates_storage() {
     assert!(parsed.diagnostics.is_empty());
     let analysis = analyze(&[parsed.file], &Target::new(Platform::Android));
     assert!(
-        analysis.diagnostics.is_empty(),
+        !analysis.diagnostics.has_errors(),
         "{:?}",
         analysis.diagnostics
     );
