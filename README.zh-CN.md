@@ -169,6 +169,7 @@ Text(format(startsAt, .dateTime(.short)))
 | `veyra init [path]` | 创建项目 |
 | `veyra check` | 检查源码，不写入文件 |
 | `veyra build` | 检查源码并生成代码 |
+| `veyra fmt [--check] [files]` | 格式化源码，保留注释 |
 | `veyra l10n status` | 显示翻译进度 |
 | `veyra l10n prune` | 删除源码中已不存在的key |
 

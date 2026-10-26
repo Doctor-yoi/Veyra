@@ -37,8 +37,7 @@ screen Settings {
       Toggle(loc("settings.reminder", "上课提醒"), isOn: bind(reminder))
       Slider(value: bind(volume), min: 0, max: 1)
       TextField(loc("settings.nickname", "昵称"), text: bind(nickname))
-      Button(loc("settings.save", "保存"), action: save)
-        .frame(maxWidth: .infinity)
+      Button(loc("settings.save", "保存"), action: save).frame(maxWidth: .infinity)
       if signedIn {
         Button(loc("settings.sign_out", "退出登录"), action: signOut)
       }

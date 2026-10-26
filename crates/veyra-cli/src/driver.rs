@@ -461,3 +461,72 @@ pub(crate) fn l10n_prune(dir: &Path, color: bool) -> bool {
     println!("已删除{removed}条过时的翻译");
     ok
 }
+
+/// 格式化文件，`check`为真时只报告需要格式化的文件
+pub(crate) fn fmt(dir: &Path, files: &[std::path::PathBuf], check: bool, color: bool) -> bool {
+    let mut r = Reporter::new(color);
+    let targets: Vec<std::path::PathBuf> = if files.is_empty() {
+        let project = match Project::discover(dir, &backend_names()) {
+            Ok(p) => p,
+            Err(d) => {
+                r.push(d);
+                return r.finish();
+            }
+        };
+        match project.source_files() {
+            Ok(fs) => fs.into_iter().map(|f| project.root.join(f)).collect(),
+            Err(d) => {
+                r.push(d);
+                return r.finish();
+            }
+        }
+    } else {
+        files.iter().map(|f| dir.join(f)).collect()
+    };
+    let mut changed = Vec::new();
+    for path in &targets {
+        let text = match std::fs::read_to_string(path) {
+            Ok(t) => t,
+            Err(e) => {
+                r.push(Diagnostic::error(
+                    "V9004",
+                    format!("无法读取{}：{e}", path.display()),
+                ));
+                continue;
+            }
+        };
+        let id = r.sources.add(path, text.as_str());
+        let parsed = veyra_syntax::parse(id, &text);
+        if parsed.diagnostics.has_errors() {
+            r.extend(parsed.diagnostics);
+            continue;
+        }
+        let formatted = veyra_syntax::format(&parsed, &text);
+        if formatted == text {
+            continue;
+        }
+        changed.push(path.clone());
+        if !check && let Err(e) = std::fs::write(path, formatted) {
+            r.push(Diagnostic::error(
+                "V9007",
+                format!("无法写入{}：{e}", path.display()),
+            ));
+        }
+    }
+    let mut ok = r.finish();
+    for p in &changed {
+        eprintln!(
+            "    {} {}",
+            if check {
+                "需要格式化"
+            } else {
+                "已格式化"
+            },
+            p.display()
+        );
+    }
+    if check && !changed.is_empty() {
+        ok = false;
+    }
+    ok
+}

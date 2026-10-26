@@ -77,6 +77,14 @@ enum Command {
     Check(BuildArgs),
     /// 检查源码并生成代码
     Build(BuildArgs),
+    /// 按统一风格格式化.vey文件
+    Fmt {
+        /// 只检查格式，有文件需要格式化时返回失败
+        #[arg(long)]
+        check: bool,
+        /// 要格式化的文件，默认为项目中的全部源文件
+        files: Vec<PathBuf>,
+    },
     /// 管理翻译文件
     L10n {
         #[command(subcommand)]
@@ -116,6 +124,7 @@ fn main() -> ExitCode {
         }
         Command::Check(args) => driver::check(&dir, &args, color),
         Command::Build(args) => driver::build(&dir, &args, color),
+        Command::Fmt { check, files } => driver::fmt(&dir, &files, check, color),
         Command::L10n {
             command: L10nCommand::Status,
         } => driver::l10n_status(&dir, color),
