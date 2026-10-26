@@ -72,3 +72,30 @@ fn generates_schedule() {
         insta::assert_snapshot!(name, f.contents);
     }
 }
+
+#[test]
+fn generates_with_di_option() {
+    let src = include_str!("fixtures.vey");
+    let parsed = veyra_syntax::parse(Default::default(), src);
+    let analysis = analyze(&[parsed.file], &Target::new(Platform::Android));
+    let catalog = Catalog {
+        source_locale: "zh-Hans".into(),
+        target_locales: Vec::new(),
+        entries: Vec::new(),
+    };
+    let options: toml::Table = toml::from_str("package = \"com.example.schedule.ui\"\nr_package = \"com.example.schedule\"\ndi = \"hilt\"").unwrap();
+    let files = ComposeBackend
+        .generate(&BackendInput {
+            program: &analysis.program,
+            catalog: &catalog,
+            options: &options,
+        })
+        .unwrap();
+    let keep = ["Route", "ViewModel.kt", "VeyraDependencies"];
+    for f in files {
+        let name = f.path.to_string_lossy().replace('/', "__");
+        if keep.iter().any(|k| name.contains(k)) {
+            insta::assert_snapshot!(format!("di__{name}"), f.contents);
+        }
+    }
+}
