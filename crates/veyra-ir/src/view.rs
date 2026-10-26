@@ -52,15 +52,15 @@ pub enum BinaryOp {
 impl BinaryOp {
     pub fn precedence(self) -> u8 {
         match self {
-            BinaryOp::Coalesce => 1,
-            BinaryOp::Or => 2,
-            BinaryOp::And => 3,
+            BinaryOp::Or => 1,
+            BinaryOp::And => 2,
             BinaryOp::Eq
             | BinaryOp::Ne
             | BinaryOp::Lt
             | BinaryOp::Le
             | BinaryOp::Gt
-            | BinaryOp::Ge => 4,
+            | BinaryOp::Ge => 3,
+            BinaryOp::Coalesce => 4,
             BinaryOp::Add | BinaryOp::Sub => 5,
             BinaryOp::Mul | BinaryOp::Div | BinaryOp::Rem => 6,
         }

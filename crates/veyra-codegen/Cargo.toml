@@ -1,0 +1,18 @@
+[package]
+name = "veyra-codegen"
+description = "Veyra代码生成后端的公共接口与工具"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license-file.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[dependencies]
+toml.workspace = true
+veyra-diagnostics.workspace = true
+veyra-ir.workspace = true
+
+[lints]
+workspace = true

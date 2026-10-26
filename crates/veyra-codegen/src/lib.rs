@@ -1,0 +1,79 @@
+// SPDX-License-Identifier: AGPL-3.0-only AND LicenseRef-Commons-Clause-1.0
+// Copyright (C) 2026 Doctor-yoi
+
+//! Veyra代码生成后端的公共接口。
+//!
+//! 每个平台后端实现[`Backend`]，接收已裁剪并检查过的IR与本地化目录，
+//! 返回一组待写入的文件。后端只负责生成内容，写入、跳过与清理由调用方处理。
+//! 新增平台时实现该trait并在CLI的后端注册表中登记即可。
+
+mod naming;
+mod writer;
+
+pub use naming::{camel_case, escape_ident, pascal_case, snake_case};
+pub use writer::CodeWriter;
+
+use std::path::PathBuf;
+
+use veyra_diagnostics::Diagnostics;
+use veyra_ir::{Catalog, Platform, Program};
+
+/// 生成文件的归属。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Ownership {
+    /// 每次构建都会覆盖
+    Generated,
+    /// 只在不存在时创建，之后归开发者所有
+    UserOwned,
+}
+
+/// 待写入的文件，路径相对于项目根目录。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OutputFile {
+    pub path: PathBuf,
+    pub contents: String,
+    pub ownership: Ownership,
+}
+
+impl OutputFile {
+    pub fn generated(path: impl Into<PathBuf>, contents: impl Into<String>) -> Self {
+        Self {
+            path: path.into(),
+            contents: contents.into(),
+            ownership: Ownership::Generated,
+        }
+    }
+
+    pub fn user_owned(path: impl Into<PathBuf>, contents: impl Into<String>) -> Self {
+        Self {
+            path: path.into(),
+            contents: contents.into(),
+            ownership: Ownership::UserOwned,
+        }
+    }
+}
+
+/// 后端输入。
+pub struct BackendInput<'a> {
+    pub program: &'a Program,
+    pub catalog: &'a Catalog,
+    /// veyra.toml中该后端对应的配置段
+    pub options: &'a toml::Table,
+}
+
+/// 平台代码生成后端。
+pub trait Backend {
+    /// 配置段名称，例如`swiftui`
+    fn name(&self) -> &'static str;
+
+    /// 目标平台，决定条件编译的裁剪结果
+    fn platform(&self) -> Platform;
+
+    fn generate(&self, input: &BackendInput<'_>) -> Result<Vec<OutputFile>, Diagnostics>;
+}
+
+/// 生成文件头部的说明。
+pub const GENERATED_NOTICE: &str = "此文件由Veyra生成，请勿手动修改。";
+
+/// 开发者自有文件头部的说明。
+pub const USER_OWNED_NOTICE: &str = "此文件由Veyra创建，之后不会再被覆盖。";
