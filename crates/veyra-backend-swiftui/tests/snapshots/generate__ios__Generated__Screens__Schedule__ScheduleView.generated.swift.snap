@@ -21,6 +21,8 @@ struct ScheduleView<ViewModel: ScheduleViewModelContract>: View {
                 SecureField(String("密码"), text: Binding(get: { viewModel.state.password }, set: { viewModel.setPassword($0) }))
                 Toggle(L10n.scheduleNotify, isOn: Binding(get: { viewModel.state.notify }, set: { viewModel.setNotify($0) }))
                 Slider(value: Binding(get: { viewModel.state.volume }, set: { viewModel.setVolume($0) }), in: 0.0...1.0)
+                Text(viewModel.state.volume.formatted(.percent))
+                Text(L10n.scheduleItems(count: viewModel.state.count))
                 Button(L10n.scheduleRefresh) {
                     Task { await viewModel.refresh() }
                 }
@@ -36,6 +38,9 @@ struct ScheduleView<ViewModel: ScheduleViewModelContract>: View {
                             Image("book")
                             Text(course.name)
                                 .font(.headline)
+                            Text(course.credits.formatted(.number))
+                            Text(course.startsAt.formatted(date: .numeric, time: .shortened))
+                            Text(course.credits.formatted(.currency(code: "CNY")))
                             Spacer()
                             Text(course.teacher ?? "-")
                                 .foregroundStyle(Color.gray)

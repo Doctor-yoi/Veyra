@@ -6,6 +6,7 @@ model Course {
   credits: Double
   kind: CourseKind
   teacher: String?
+  startsAt: Date
 }
 
 repository CourseRepository {
@@ -58,6 +59,8 @@ screen Schedule {
         SecureField("密码", text: bind(password))
         Toggle(loc("schedule.notify", "上课提醒"), isOn: bind(notify))
         Slider(value: bind(volume), min: 0, max: 1)
+        Text(format(volume, .percent))
+        Text(plural("schedule.items", count, other: "{count}门课"))
         Button(loc("schedule.refresh", "刷新"), action: refresh)
           .disabled(!canRefresh)
           .frame(maxWidth: .infinity)
@@ -70,6 +73,9 @@ screen Schedule {
             Row(alignment: .center) {
               Image("book")
               Text(course.name).font(.headline)
+              Text(format(course.credits, .number))
+              Text(format(course.startsAt, .dateTime(.short)))
+              Text(format(course.credits, .currency("CNY")))
               Spacer()
               Text(course.teacher ?? "-").foreground(.gray)
             }

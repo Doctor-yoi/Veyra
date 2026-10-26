@@ -33,12 +33,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.example.schedule.R
+import java.time.format.FormatStyle
 
 @Composable
 fun ScheduleContent(
@@ -80,6 +82,8 @@ fun ScheduleContent(
                 onValueChange = { actions.setVolume(it.toDouble()) },
                 valueRange = 0.0f..1.0f,
             )
+            Text(text = veyraFormatPercent(state.volume))
+            Text(text = pluralStringResource(R.plurals.schedule_items, state.count, state.count))
             Button(
                 onClick = { actions.refresh() },
                 enabled = state.canRefresh,
@@ -101,6 +105,9 @@ fun ScheduleContent(
                         ) {
                             Image(painter = painterResource(id = R.drawable.book), contentDescription = null)
                             Text(text = course.name, style = MaterialTheme.typography.titleMedium)
+                            Text(text = veyraFormatNumber(course.credits))
+                            Text(text = veyraFormatDate(course.startsAt, date = FormatStyle.SHORT, time = FormatStyle.SHORT))
+                            Text(text = veyraFormatCurrency(course.credits, "CNY"))
                             Spacer(modifier = Modifier.weight(1f))
                             Text(text = course.teacher ?: "-", color = Color.Gray)
                         }

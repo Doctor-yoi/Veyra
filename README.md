@@ -90,6 +90,14 @@ state {
 
 Localized text is declared explicitly with `loc(key, sourceText, args...)`. Translations live in `locales/<locale>.toml`, which `veyra build` keeps in sync: new keys are added as empty placeholders, existing translations are preserved, and placeholders are validated against the source text. Plain string literals are emitted verbatim.
 
+```
+Text(plural("cart.items", count, one: "{count} item", other: "{count} items"))
+Text(format(price, .currency("USD")))
+Text(format(startsAt, .dateTime(.short)))
+```
+
+`plural` generates String Catalog plural variations and Android `<plurals>` resources, and each translation provides the plural categories its language needs. `format` supports `.number`, `.percent`, `.currency(code)`, `.date`, `.time` and `.dateTime`, and follows the user's locale through the platform formatters.
+
 ## Generated code
 
 | | SwiftUI (iOS 17+) | Jetpack Compose |

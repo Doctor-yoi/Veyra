@@ -76,6 +76,26 @@ pub(crate) fn format_string(text: &str, s: &LocString) -> String {
     out
 }
 
+fn string(s: &LocString, text: &str) -> String {
+    format!(
+        "<string name=\"{}\">{}</string>",
+        resource_name(&s.key),
+        format_string(text, s)
+    )
+}
+
+fn plurals(s: &LocString, forms: &indexmap::IndexMap<String, String>) -> String {
+    let mut out = format!("<plurals name=\"{}\">", resource_name(&s.key));
+    for (cat, text) in forms {
+        out.push_str(&format!(
+            "\n        <item quantity=\"{cat}\">{}</item>",
+            format_string(text, s)
+        ));
+    }
+    out.push_str("\n    </plurals>");
+    out
+}
+
 fn document(lines: &[String], ignore_missing: bool) -> String {
     let mut out = String::from("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
     out.push_str(&format!("<!-- {GENERATED_NOTICE} -->\n"));
@@ -117,13 +137,9 @@ pub(crate) fn strings(catalog: &Catalog, res: &Path) -> Result<Vec<OutputFile>, 
     let source: Vec<String> = catalog
         .entries
         .iter()
-        .map(|e| {
-            let s = &e.string;
-            format!(
-                "<string name=\"{}\">{}</string>",
-                resource_name(&s.key),
-                format_string(&s.source, s)
-            )
+        .map(|e| match &e.string.plural {
+            Some(p) => plurals(&e.string, &p.forms),
+            None => string(&e.string, &e.string.source),
         })
         .collect();
     out.push(OutputFile::generated(
@@ -135,12 +151,9 @@ pub(crate) fn strings(catalog: &Catalog, res: &Path) -> Result<Vec<OutputFile>, 
             .entries
             .iter()
             .filter_map(|e| match e.translations.get(locale) {
-                Some(Translation::Text(t)) => Some(format!(
-                    "<string name=\"{}\">{}</string>",
-                    resource_name(&e.string.key),
-                    format_string(t, &e.string)
-                )),
-                _ => None,
+                Some(Translation::Text(t)) => Some(string(&e.string, t)),
+                Some(Translation::Plural(forms)) => Some(plurals(&e.string, forms)),
+                None => None,
             })
             .collect();
         out.push(OutputFile::generated(

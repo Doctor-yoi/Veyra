@@ -34,7 +34,7 @@ screen Schedule {
   view {
     Column(spacing: 12, alignment: .leading) {
       Text(loc("schedule.title", "我的课表")).font(.largeTitle)
-      Text(loc("schedule.count", "共{count}门课程", count: count)).foreground(.secondary)
+      Text(plural("schedule.count", count, other: "共{count}门课程")).foreground(.secondary)
       TextField(loc("schedule.search", "搜索课程"), text: bind(query))
       #if ios
       Toggle(loc("schedule.compact", "紧凑模式"), isOn: bind(compact))
@@ -50,6 +50,7 @@ screen Schedule {
         List(items, key: .id) { course in
           Row(spacing: 8) {
             Text(course.name).font(.headline)
+            Text(format(course.credits, .number))
             Spacer()
             Text(course.teacher ?? "-").foreground(.secondary)
           }
