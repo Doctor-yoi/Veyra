@@ -113,6 +113,7 @@ impl<'a> Checker<'a> {
     }
 
     fn check_model_fields(&mut self, d: &'a ast::ModelDecl) -> Vec<FieldDef> {
+        self.current = d.span.file;
         let mut out: Vec<FieldDef> = Vec::new();
         for field in self.prune_decls(&d.fields) {
             self.check_member_name(&field.name);
@@ -190,6 +191,7 @@ impl<'a> Checker<'a> {
     }
 
     fn check_repository(&mut self, d: &'a ast::RepositoryDecl) -> RepositoryDef {
+        self.current = d.span.file;
         let mut methods: Vec<MethodDef> = Vec::new();
         for m in self.prune_decls(&d.methods) {
             self.check_member_name(&m.name);
@@ -305,7 +307,7 @@ impl<'a> Checker<'a> {
                         }
                         return Type::Stream(Box::new(inner));
                     }
-                    other => match self.globals.get(other).map(|(g, _)| *g) {
+                    other => match self.lookup(other, name.span) {
                         Some(Global::Enum(_)) => Type::Enum(other.to_string()),
                         Some(Global::Model(_) | Global::Entity(_)) => {
                             Type::Model(other.to_string())

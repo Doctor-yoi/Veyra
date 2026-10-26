@@ -26,6 +26,7 @@ impl<'a> Checker<'a> {
     /// 先登记全部签名，组件之间可以互相引用
     pub(crate) fn check_component_signatures(&mut self) {
         for d in self.component_decls() {
+            self.current = d.span.file;
             let mut params: Vec<ComponentParam> = Vec::new();
             for p in &d.params {
                 self.check_member_name(&p.name);
@@ -69,6 +70,7 @@ impl<'a> Checker<'a> {
     pub(crate) fn check_components(&mut self) -> Vec<ir::ComponentDef> {
         let mut out = Vec::new();
         for d in self.component_decls() {
+            self.current = d.span.file;
             let params = self
                 .components
                 .get(&d.name.name)

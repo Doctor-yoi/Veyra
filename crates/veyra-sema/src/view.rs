@@ -50,6 +50,7 @@ impl<'a> Checker<'a> {
         }
         let name = &el.path[0];
         if self.components.contains_key(&name.name) {
+            self.lookup(&name.name, name.span);
             return self.component_instance(sc, el);
         }
         let Some(builtin) = Builtin::from_name(&name.name) else {

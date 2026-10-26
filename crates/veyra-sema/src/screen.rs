@@ -26,6 +26,7 @@ impl<'a> Checker<'a> {
     }
 
     fn check_screen(&mut self, d: &'a ast::ScreenDecl) -> ir::ScreenDef {
+        self.current = d.span.file;
         let members = self.prune_decls(&d.members);
         let mut info = ScreenInfo::default();
         let mut names: IndexMap<String, Span> = IndexMap::new();
@@ -58,7 +59,7 @@ impl<'a> Checker<'a> {
                     if !claim(self, &inj.name) {
                         continue;
                     }
-                    match self.globals.get(&inj.ty.name).map(|(g, _)| *g) {
+                    match self.lookup(&inj.ty.name, inj.ty.span) {
                         Some(Global::Repository(_)) => {
                             info.injects.insert(inj.name.name.clone());
                             injects.push(InjectDef {
