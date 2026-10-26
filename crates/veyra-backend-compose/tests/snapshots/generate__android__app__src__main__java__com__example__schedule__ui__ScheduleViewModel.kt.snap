@@ -1,0 +1,24 @@
+---
+source: crates/veyra-backend-compose/tests/generate.rs
+expression: f.contents
+---
+// This file is created by Veyra and will not be overwritten
+
+package com.example.schedule.ui
+
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
+
+class ScheduleViewModel(
+    private val courses: CourseRepository,
+) : ScheduleViewModelBase() {
+    override fun refresh() {
+        viewModelScope.launch {
+            // Implement business logic here
+        }
+    }
+
+    override fun openCourse(id: String) {
+        // Implement business logic here
+    }
+}
