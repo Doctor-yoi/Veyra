@@ -74,6 +74,7 @@ View不能调用任意函数、修改状态或访问注入的依赖，有副作�
 | --- | --- |
 | `enum`、`model` | 各层共享的值类型 |
 | `repository` | 数据访问契约，由各平台原生实现 |
+| `component` | 不含业务状态的可复用视图，参数可以是值、`Action`与`Binding<T>` |
 | `screen` | 页面，包含`inject`、`state`、`computed`、`actions`、`effects`、`lifecycle`与`view` |
 
 `effects`声明导航等一次性事件，由ViewModel通过`emit`发出，组装层通过`onEffect`接收，View本身不处理。`lifecycle`在页面出现或消失时分发action。

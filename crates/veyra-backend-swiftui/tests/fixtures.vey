@@ -14,6 +14,21 @@ repository CourseRepository {
   observeCourses() -> Stream<List<Course>>
 }
 
+component SearchBar(text: Binding<String>, placeholder: String) {
+  Row(spacing: 8) {
+    Image("search")
+    TextField(placeholder, text: text)
+  }
+}
+
+component CourseCard(course: Course, note: String?, onTap: Action) {
+  Column(alignment: .leading) {
+    Text(course.name).font(.headline)
+    Text(note ?? "").foreground(.secondary)
+  }
+  .onTap(onTap)
+}
+
 screen Schedule {
   inject courses: CourseRepository
 
@@ -56,6 +71,7 @@ screen Schedule {
         Text(loc("schedule.count", "共{count}门课程，筛选：{filter}", count: count, filter: subtitle))
           .foreground(.secondary)
         TextField(loc("schedule.search", "搜索课程"), text: bind(query))
+        SearchBar(text: bind(query), placeholder: "搜索")
         SecureField("密码", text: bind(password))
         Toggle(loc("schedule.notify", "上课提醒"), isOn: bind(notify))
         Slider(value: bind(volume), min: 0, max: 1)
@@ -84,6 +100,9 @@ screen Schedule {
             .onTap(openCourse(course.id))
             .accessibilityLabel(course.name)
           }
+        }
+        ForEach(items, key: .id) { course in
+          CourseCard(course: course, onTap: openCourse(course.id))
         }
         Divider()
         Stack(alignment: .bottomTrailing) {

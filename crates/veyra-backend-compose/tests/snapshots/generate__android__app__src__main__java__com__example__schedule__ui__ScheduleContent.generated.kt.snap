@@ -67,6 +67,7 @@ fun ScheduleContent(
                 onValueChange = { actions.setQuery(it) },
                 label = { Text(text = stringResource(R.string.schedule_search)) },
             )
+            SearchBar(text = state.query, onTextChange = { actions.setQuery(it) }, placeholder = "搜索")
             OutlinedTextField(
                 value = state.password,
                 onValueChange = { actions.setPassword(it) },
@@ -112,6 +113,11 @@ fun ScheduleContent(
                             Text(text = course.teacher ?: "-", color = Color.Gray)
                         }
                     }
+                }
+            }
+            state.items.forEach { course ->
+                key(course.id) {
+                    CourseCard(course = course, note = null, onTap = { actions.openCourse(id = course.id) })
                 }
             }
             HorizontalDivider()

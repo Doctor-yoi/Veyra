@@ -6,7 +6,7 @@
 //! SwiftUI的修饰符由内向外包裹，Compose的Modifier链由外向内生效，
 //! 因此链式修饰符需要倒序输出
 
-use veyra_codegen::CodeWriter;
+use veyra_codegen::{CodeWriter, pascal_case};
 use veyra_ir::{
     ActionRef, BindingRef, Builtin, Element, ElementKind, Expr, ExprKind, Modifier, ModifierKind,
     UnaryOp, Value, ViewNode,
@@ -141,7 +141,7 @@ impl ViewEmitter<'_> {
                 format!("{{ {}.{}(it{convert}) }}", self.actions, ident(setter)),
             ),
             Some(BindingRef::Param { name, .. }) => {
-                let cb = format!("on{}Change", veyra_codegen::pascal_case(name));
+                let cb = format!("on{}Change", pascal_case(name));
                 (ident(name), format!("{{ {cb}(it{convert}) }}"))
             }
             None => ("TODO()".into(), "{}".into()),
@@ -336,10 +336,36 @@ impl ViewEmitter<'_> {
         parent: Parent,
         base: Option<&str>,
     ) {
-        let ElementKind::Builtin(b) = &el.kind else {
-            return;
-        };
         let base = base.unwrap_or("Modifier");
+        let b = match &el.kind {
+            ElementKind::Builtin(b) => b,
+            ElementKind::Component(name) => {
+                let mut call = Call::new(name);
+                for (n, v) in &el.args {
+                    match v {
+                        Value::Expr(x) => {
+                            let value = self.e(x);
+                            call.arg(&ident(n), value);
+                        }
+                        Value::Action(_) => {
+                            let a = self.action(Some(v));
+                            call.arg(&ident(n), format!("{{ {a} }}"));
+                        }
+                        Value::Binding(_) => {
+                            let (value, change) = self.binding(Some(v), "");
+                            call.arg(&ident(n), value);
+                            call.arg(&format!("on{}Change", pascal_case(n)), change);
+                        }
+                        Value::KeyPath(_) | Value::Token(_) => {}
+                    }
+                }
+                if let Some(m) = self.modifier_chain(w, &el.modifiers, None, base) {
+                    call.arg("modifier", m);
+                }
+                call.render(w, None);
+                return;
+            }
+        };
         let mods = &el.modifiers;
         let arg = |n: &str| el.arg(n);
         match b {

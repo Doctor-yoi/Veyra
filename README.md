@@ -74,6 +74,7 @@ Declarations:
 | --- | --- |
 | `enum`, `model` | Value types shared by all layers |
 | `repository` | Data access contract, implemented natively on each platform |
+| `component` | Reusable view without business state, taking values, `Action` and `Binding<T>` parameters |
 | `screen` | A page with `inject`, `state`, `computed`, `actions`, `effects`, `lifecycle` and `view` |
 
 `effects` declares one-off events such as navigation. The view model emits them with `emit`, and the root view or route receives them through `onEffect`, so views never handle them. `lifecycle` dispatches actions when a screen appears or disappears.
