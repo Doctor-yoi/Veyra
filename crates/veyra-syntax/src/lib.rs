@@ -5,13 +5,15 @@
 //!
 //! 解析流程为`源码 -> token -> AST`，语法对换行不敏感，
 //! 遇到错误时会跳过当前行或当前块继续解析，以便一次报告尽可能多的问题
-//! 注释不进入AST，而是按位置单独返回，供格式化器还原
+//! 注释不进入AST，而是按位置单独返回，供[`format`]还原
 
 pub mod ast;
+mod fmt;
 mod lexer;
 mod parser;
 mod token;
 
+pub use fmt::format;
 pub use lexer::{dedent_raw, unescape};
 pub use token::{Comment, Token, TokenKind};
 
