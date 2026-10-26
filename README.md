@@ -68,6 +68,18 @@ Every interaction in a view falls into one of three forms, and the compiler chec
 
 Views cannot call arbitrary functions, mutate state or access injected dependencies. Side effects belong in actions, which the view model implements.
 
+Each file sees only its own declarations and those of the files it imports. Import paths are relative to the current file, and imports are not transitive:
+
+```
+import "models.vey"
+import (
+  "stores/NoteStore.vey"
+  "../shared/Theme.vey"
+)
+```
+
+Using a type from a file that is not imported is an error, and the message suggests the missing `import`. Imported files outside `sources` are loaded automatically, and unused imports produce a warning. All declarations still share one namespace, because the generated code lives in one module per platform.
+
 Declarations:
 
 | Declaration | Purpose |

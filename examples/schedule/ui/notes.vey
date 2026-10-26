@@ -1,24 +1,6 @@
-// 课程笔记：本地持久化
+// 课程笔记页面
 
-entity Note @persistent {
-  id: String @primaryKey
-  courseId: String @indexed
-  text: String
-  pinned: Bool
-  createdAt: Date
-}
-
-store NoteStore for Note {
-  query forCourse(course: String) -> Stream<List<Note>> {
-    where courseId == course
-    orderBy createdAt desc
-  }
-
-  query pinnedNotes() -> List<Note> {
-    where pinned
-    limit 10
-  }
-}
+import "stores/NoteStore.vey"
 
 screen Notes {
   inject notes: NoteStore

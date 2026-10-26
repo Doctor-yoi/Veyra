@@ -1,5 +1,7 @@
 // 课表页：搜索、刷新与课程列表
 
+import "models.vey"
+
 component CourseRow(course: Course, onTap: Action) {
   Row(spacing: 8) {
     Text(course.name).font(.headline)
