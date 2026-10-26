@@ -20,7 +20,9 @@ use indexmap::IndexMap;
 use serde::Deserialize;
 use toml_edit::{DocumentMut, Item, Value, value};
 use veyra_diagnostics::{Diagnostic, Diagnostics};
-use veyra_ir::{Catalog, CatalogEntry, LocString, PLURAL_CATEGORIES, Segment, Translation, parse_template};
+use veyra_ir::{
+    Catalog, CatalogEntry, LocString, PLURAL_CATEGORIES, Segment, Translation, parse_template,
+};
 
 /// 缺失翻译的处理方式
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
@@ -43,11 +45,16 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Self {
-        Self { source: "en".into(), targets: Vec::new(), dir: "locales".into(), missing: Missing::Warn }
+        Self {
+            source: "en".into(),
+            targets: Vec::new(),
+            dir: "locales".into(),
+            missing: Missing::Warn,
+        }
     }
 }
 
-const FILE_NOTICE: &str = "# Translations for Veyra, fill in the empty strings\n# Each comment above a key shows the source text\n\n";
+const FILE_NOTICE: &str = "# Translations for Veyra, fill in the empty strings\n# Each comment above a key shows the source text\n";
 
 /// 一个语言文件的同步结果
 #[derive(Clone, Debug)]
@@ -78,8 +85,11 @@ pub fn merge_strings(lists: &[Vec<LocString>]) -> Result<Vec<LocString>, Diagnos
         for s in list {
             match map.get(&s.key) {
                 Some(prev) if prev != s => diags.push(
-                    Diagnostic::error("V4001", format!("本地化key`{}`在不同平台的定义不一致", s.key))
-                        .with_note("同一个key在所有平台必须使用相同的源文案与参数"),
+                    Diagnostic::error(
+                        "V4001",
+                        format!("本地化key`{}`在不同平台的定义不一致", s.key),
+                    )
+                    .with_note("同一个key在所有平台必须使用相同的源文案与参数"),
                 ),
                 Some(_) => {}
                 None => {
@@ -103,14 +113,30 @@ pub fn sync(strings: &[LocString], config: &Config, root: &Path) -> Sync {
     let mut translations: IndexMap<String, IndexMap<String, Translation>> = IndexMap::new();
     for locale in &config.targets {
         if *locale == config.source {
-            diags.push(Diagnostic::error("V4030", format!("目标语言`{locale}`与源语言相同")));
+            diags.push(Diagnostic::error(
+                "V4030",
+                format!("目标语言`{locale}`与源语言相同"),
+            ));
             continue;
         }
         let rel = config.dir.join(format!("{locale}.toml"));
         let original = std::fs::read_to_string(root.join(&rel)).unwrap_or_default();
-        let file = sync_file(locale, &rel, &original, strings, &mut translations, &mut diags);
+        let file = sync_file(
+            locale,
+            &rel,
+            &original,
+            strings,
+            &mut translations,
+            &mut diags,
+        );
         if !file.missing.is_empty() {
-            let shown = file.missing.iter().take(5).map(|k| format!("`{k}`")).collect::<Vec<_>>().join("、");
+            let shown = file
+                .missing
+                .iter()
+                .take(5)
+                .map(|k| format!("`{k}`"))
+                .collect::<Vec<_>>()
+                .join("、");
             let more = if file.missing.len() > 5 { "等" } else { "" };
             let message = format!("`{locale}`缺少{}条翻译：{shown}{more}", file.missing.len());
             let d = match config.missing {
@@ -121,8 +147,11 @@ pub fn sync(strings: &[LocString], config: &Config, root: &Path) -> Sync {
         }
         if !file.stale.is_empty() {
             diags.push(
-                Diagnostic::warning("V4020", format!("`{}`中有{}条过时的翻译", rel.display(), file.stale.len()))
-                    .with_note("运行`veyra l10n prune`删除源码中已不存在的key"),
+                Diagnostic::warning(
+                    "V4020",
+                    format!("`{}`中有{}条过时的翻译", rel.display(), file.stale.len()),
+                )
+                .with_note("运行`veyra l10n prune`删除源码中已不存在的key"),
             );
         }
         files.push(file);
@@ -134,12 +163,25 @@ pub fn sync(strings: &[LocString], config: &Config, root: &Path) -> Sync {
             translations: config
                 .targets
                 .iter()
-                .filter_map(|l| translations.get(l).and_then(|t| t.get(&s.key)).map(|t| (l.clone(), t.clone())))
+                .filter_map(|l| {
+                    translations
+                        .get(l)
+                        .and_then(|t| t.get(&s.key))
+                        .map(|t| (l.clone(), t.clone()))
+                })
                 .collect(),
         })
         .collect();
-    let catalog = Catalog { source_locale: config.source.clone(), target_locales: config.targets.clone(), entries };
-    Sync { catalog, files, diagnostics: diags }
+    let catalog = Catalog {
+        source_locale: config.source.clone(),
+        target_locales: config.targets.clone(),
+        entries,
+    };
+    Sync {
+        catalog,
+        files,
+        diagnostics: diags,
+    }
 }
 
 fn placeholder_names(text: &str) -> Result<BTreeSet<String>, String> {
@@ -153,11 +195,20 @@ fn placeholder_names(text: &str) -> Result<BTreeSet<String>, String> {
 }
 
 /// 检查一条翻译的占位符
-fn check_text(locale: &str, s: &LocString, text: &str, path: &Path, diags: &mut Diagnostics) -> bool {
+fn check_text(
+    locale: &str,
+    s: &LocString,
+    text: &str,
+    path: &Path,
+    diags: &mut Diagnostics,
+) -> bool {
     let allowed: BTreeSet<String> = s.args.iter().map(|a| a.name.clone()).collect();
     match placeholder_names(text) {
         Err(msg) => {
-            diags.push(Diagnostic::error("V4021", format!("`{locale}`中`{}`的翻译无效：{msg}", s.key)).with_note(path.display().to_string()));
+            diags.push(
+                Diagnostic::error("V4021", format!("`{locale}`中`{}`的翻译无效：{msg}", s.key))
+                    .with_note(path.display().to_string()),
+            );
             false
         }
         Ok(names) => {
@@ -165,10 +216,17 @@ fn check_text(locale: &str, s: &LocString, text: &str, path: &Path, diags: &mut 
             if unknown.is_empty() {
                 return true;
             }
-            let list = unknown.iter().map(|n| format!("{{{n}}}")).collect::<Vec<_>>().join("、");
+            let list = unknown
+                .iter()
+                .map(|n| format!("{{{n}}}"))
+                .collect::<Vec<_>>()
+                .join("、");
             diags.push(
-                Diagnostic::error("V4021", format!("`{locale}`中`{}`的翻译包含源文案没有的占位符{list}", s.key))
-                    .with_note(path.display().to_string()),
+                Diagnostic::error(
+                    "V4021",
+                    format!("`{locale}`中`{}`的翻译包含源文案没有的占位符{list}", s.key),
+                )
+                .with_note(path.display().to_string()),
             );
             false
         }
@@ -186,7 +244,10 @@ fn sync_file(
     let mut doc = match original.parse::<DocumentMut>() {
         Ok(d) => d,
         Err(e) => {
-            diags.push(Diagnostic::error("V4031", format!("无法解析{}：{}", rel.display(), e.message())));
+            diags.push(Diagnostic::error(
+                "V4031",
+                format!("无法解析{}：{}", rel.display(), e.message()),
+            ));
             return LocaleFile {
                 locale: locale.into(),
                 path: rel.into(),
@@ -239,7 +300,10 @@ fn sync_file(
                 if let Some(t) = item.as_table_like() {
                     for (cat, v) in t.iter() {
                         if !PLURAL_CATEGORIES.contains(&cat) {
-                            diags.push(Diagnostic::error("V4022", format!("`{locale}`中`{key}`包含未知的复数类别`{cat}`")));
+                            diags.push(Diagnostic::error(
+                                "V4022",
+                                format!("`{locale}`中`{key}`包含未知的复数类别`{cat}`"),
+                            ));
                             continue;
                         }
                         if let Some(text) = v.as_str()
@@ -251,7 +315,10 @@ fn sync_file(
                     }
                 }
                 if s.plural.is_none() {
-                    diags.push(Diagnostic::error("V4022", format!("`{locale}`中`{key}`不是复数文案，翻译应为字符串")));
+                    diags.push(Diagnostic::error(
+                        "V4022",
+                        format!("`{locale}`中`{key}`不是复数文案，翻译应为字符串"),
+                    ));
                     None
                 } else if !forms.contains_key("other") {
                     None
@@ -260,7 +327,10 @@ fn sync_file(
                 }
             }
             _ => {
-                diags.push(Diagnostic::error("V4022", format!("`{locale}`中`{key}`的翻译必须是字符串")));
+                diags.push(Diagnostic::error(
+                    "V4022",
+                    format!("`{locale}`中`{key}`的翻译必须是字符串"),
+                ));
                 None
             }
         };
@@ -272,10 +342,21 @@ fn sync_file(
         }
     }
     let known: BTreeSet<&str> = strings.iter().map(|s| s.key.as_str()).collect();
-    let stale: Vec<String> = table.iter().map(|(k, _)| k.to_string()).filter(|k| !known.contains(k.as_str())).collect();
+    let stale: Vec<String> = table
+        .iter()
+        .map(|(k, _)| k.to_string())
+        .filter(|k| !known.contains(k.as_str()))
+        .collect();
     out.insert(locale.to_string(), found);
     let contents = doc.to_string();
-    LocaleFile { locale: locale.into(), path: rel.into(), changed: contents != original, contents, stale, missing }
+    LocaleFile {
+        locale: locale.into(),
+        path: rel.into(),
+        changed: contents != original,
+        contents,
+        stale,
+        missing,
+    }
 }
 
 /// 删除过时的key，返回新内容
@@ -298,18 +379,34 @@ mod tests {
         LocString {
             key: key.into(),
             source: source.into(),
-            args: args.iter().map(|a| LocArg { name: a.to_string(), ty: LocArgType::Int }).collect(),
+            args: args
+                .iter()
+                .map(|a| LocArg {
+                    name: a.to_string(),
+                    ty: LocArgType::Int,
+                })
+                .collect(),
             plural: None,
         }
     }
 
     #[test]
     fn inserts_new_keys_and_keeps_translations() {
-        let strings = vec![s("home.count", "共{count}项", &["count"]), s("home.title", "首页", &[])];
+        let strings = vec![
+            s("home.count", "共{count}项", &["count"]),
+            s("home.title", "首页", &[]),
+        ];
         let original = "# 手写注释\n\"home.title\" = \"Home\"\n\"old.key\" = \"Old\"\n";
         let mut out = IndexMap::new();
         let mut diags = Diagnostics::new();
-        let file = sync_file("en", Path::new("locales/en.toml"), original, &strings, &mut out, &mut diags);
+        let file = sync_file(
+            "en",
+            Path::new("locales/en.toml"),
+            original,
+            &strings,
+            &mut out,
+            &mut diags,
+        );
         assert!(diags.is_empty());
         assert_eq!(
             file.contents,
@@ -318,7 +415,10 @@ mod tests {
         assert_eq!(file.missing, vec!["home.count"]);
         assert_eq!(file.stale, vec!["old.key"]);
         assert_eq!(out["en"]["home.title"], Translation::Text("Home".into()));
-        assert_eq!(prune(&file), "# 手写注释\n\"home.title\" = \"Home\"\n\n# 共{count}项\n\"home.count\" = \"\"\n");
+        assert_eq!(
+            prune(&file),
+            "# 手写注释\n\"home.title\" = \"Home\"\n\n# 共{count}项\n\"home.count\" = \"\"\n"
+        );
     }
 
     #[test]
@@ -326,7 +426,14 @@ mod tests {
         let strings = vec![s("a.b", "{count}", &["count"])];
         let mut out = IndexMap::new();
         let mut diags = Diagnostics::new();
-        sync_file("en", Path::new("en.toml"), "\"a.b\" = \"{n}\"\n", &strings, &mut out, &mut diags);
+        sync_file(
+            "en",
+            Path::new("en.toml"),
+            "\"a.b\" = \"{n}\"\n",
+            &strings,
+            &mut out,
+            &mut diags,
+        );
         assert!(diags.has_errors());
     }
 }
