@@ -73,7 +73,7 @@ screen Schedule {
         Text(errorMessage ?? "").foreground(.red)
         Text(loc("schedule.empty", "暂无课程")).foreground(.secondary)
       } else {
-        ForEach(items, key: .id) { course in
+        List(items, key: .id) { course in
           CourseRow(course: course, onTap: openCourse(course.id))
         }
       }
