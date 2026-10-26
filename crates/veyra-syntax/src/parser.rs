@@ -915,7 +915,19 @@ impl<'a> Parser<'a> {
     // ---- 表达式 ----
 
     pub(crate) fn expr(&mut self) -> Option<Expr> {
-        self.binary(0)
+        let cond = self.binary(0)?;
+        if !self.at(T::Question) {
+            return Some(cond);
+        }
+        self.bump();
+        let then = self.expr()?;
+        self.expect(T::Colon)?;
+        let else_ = self.expr()?;
+        let span = cond.span.to(else_.span);
+        Some(Expr {
+            kind: ExprKind::Ternary(Box::new(cond), Box::new(then), Box::new(else_)),
+            span,
+        })
     }
 
     fn binary_op(&self) -> Option<BinaryOp> {

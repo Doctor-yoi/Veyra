@@ -453,6 +453,8 @@ pub enum ExprKind {
     Call(Box<Expr>, Vec<Arg>),
     Unary(UnaryOp, Box<Expr>),
     Binary(BinaryOp, Box<Expr>, Box<Expr>),
+    /// `cond ? a : b`
+    Ternary(Box<Expr>, Box<Expr>, Box<Expr>),
     List(Vec<Expr>),
     Paren(Box<Expr>),
     /// 解析失败时的占位
