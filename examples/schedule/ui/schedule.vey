@@ -1,0 +1,57 @@
+// 课表页：搜索、刷新与课程列表
+
+screen Schedule {
+  inject courses: CourseRepository
+
+  state {
+    query: String = "" @writable
+    items: List<Course> = []
+    isRefreshing: Bool = false
+    errorMessage: String? = nil
+    #if ios
+    compact: Bool = false @writable
+    #endif
+  }
+
+  computed {
+    count: Int = items.count
+    canRefresh: Bool = !isRefreshing
+  }
+
+  actions {
+    refresh() async
+    openCourse(id: String)
+  }
+
+  view {
+    Column(spacing: 12, alignment: .leading) {
+      Text(loc("schedule.title", "我的课表")).font(.largeTitle)
+      Text(loc("schedule.count", "共{count}门课程", count: count)).foreground(.secondary)
+      TextField(loc("schedule.search", "搜索课程"), text: bind(query))
+      #if ios
+      Toggle(loc("schedule.compact", "紧凑模式"), isOn: bind(compact))
+      #endif
+      Button(loc("schedule.refresh", "刷新"), action: refresh)
+        .disabled(!canRefresh)
+      if isRefreshing {
+        Progress()
+      } else if items.isEmpty {
+        Text(errorMessage ?? "").foreground(.red)
+        Text(loc("schedule.empty", "暂无课程")).foreground(.secondary)
+      } else {
+        List(items, key: .id) { course in
+          Row(spacing: 8) {
+            Text(course.name).font(.headline)
+            Spacer()
+            Text(course.teacher ?? "-").foreground(.secondary)
+          }
+          .onTap(openCourse(course.id))
+        }
+      }
+      #if premium
+      Text(loc("schedule.premium", "高级版")).foreground(.accent)
+      #endif
+    }
+    .padding(16)
+  }
+}

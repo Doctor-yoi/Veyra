@@ -1,0 +1,16 @@
+// 课程数据与数据访问契约
+
+enum CourseKind { lecture, lab, seminar }
+
+model Course {
+  id: String
+  name: String
+  teacher: String?
+  credits: Double
+  kind: CourseKind
+}
+
+repository CourseRepository {
+  getCourses() async throws -> List<Course>
+  observeCourses() -> Stream<List<Course>>
+}

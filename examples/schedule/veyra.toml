@@ -1,0 +1,23 @@
+[project]
+name = "Schedule"
+sources = ["ui"]
+
+[l10n]
+source = "zh-Hans"
+targets = ["en", "ja"]
+dir = "locales"
+missing = "warn"
+
+[swiftui]
+out = "ios/Generated"
+user_dir = "ios/ViewModels"
+
+[compose]
+out = "android/app/src/main/java"
+res = "android/app/src/main/res"
+user_dir = "android/app/src/main/java"
+package = "com.example.schedule.ui"
+r_package = "com.example.schedule"
+
+[flags]
+premium = false

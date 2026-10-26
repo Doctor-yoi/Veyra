@@ -1,0 +1,32 @@
+# Translations for Veyra, fill in the empty strings
+# Each comment above a key shows the source text
+
+# 紧凑模式
+"schedule.compact" = "Compact"
+
+# 共{count}门课程
+"schedule.count" = "{count} courses"
+
+# 暂无课程
+"schedule.empty" = "No courses yet"
+
+# 刷新
+"schedule.refresh" = "Refresh"
+
+# 搜索课程
+"schedule.search" = "Search courses"
+
+# 我的课表
+"schedule.title" = "My Schedule"
+
+# 昵称
+"settings.nickname" = "Nickname"
+
+# 上课提醒
+"settings.reminder" = "Class reminder"
+
+# 保存
+"settings.save" = "Save"
+
+# 设置
+"settings.title" = "Settings"
