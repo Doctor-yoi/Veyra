@@ -6,8 +6,8 @@
 use indexmap::{IndexMap, IndexSet};
 use veyra_diagnostics::{Diagnostic, Span};
 use veyra_ir::{
-    self as ir, ActionRef, BindingRef, ExprKind, LocArg, LocArgType, LocString, Segment, Type,
-    parse_template,
+    self as ir, ActionRef, BindingRef, ComponentParamType, ExprKind, LocArg, LocArgType, LocString,
+    Segment, Type, parse_template,
 };
 use veyra_syntax::ast::{self, Arg, ExprKind as A};
 
@@ -36,6 +36,8 @@ pub(crate) struct ScreenInfo {
 
 pub(crate) enum Owner<'s> {
     Screen(&'s ScreenInfo),
+    /// 组件只能访问自己的参数
+    Component(&'s [ir::ComponentParam]),
     /// state默认值，只允许常量
     Constant,
 }
@@ -59,7 +61,14 @@ impl<'s> Scope<'s> {
     fn screen(&self) -> Option<&'s ScreenInfo> {
         match self.owner {
             Owner::Screen(s) => Some(s),
-            Owner::Constant => None,
+            Owner::Component(_) | Owner::Constant => None,
+        }
+    }
+
+    fn component_param(&self, name: &str) -> Option<&'s ComponentParamType> {
+        match self.owner {
+            Owner::Component(ps) => ps.iter().find(|p| p.name == name).map(|p| &p.ty),
+            _ => None,
         }
     }
 }
@@ -267,6 +276,21 @@ impl<'a> Checker<'a> {
     fn ident(&mut self, sc: &Scope, name: &str, span: Span) -> ir::Expr {
         if let Some(ty) = self.lookup_local(sc, name) {
             return ir::Expr::new(ExprKind::Local(name.to_string()), ty);
+        }
+        match sc.component_param(name) {
+            Some(ComponentParamType::Value(t)) => {
+                return ir::Expr::new(ExprKind::Local(name.to_string()), t.clone());
+            }
+            Some(_) => {
+                self.error(
+                    "V3004",
+                    format!("`{name}`是Action或Binding参数，不能作为值使用"),
+                    span,
+                    "",
+                );
+                return ir::Expr::unknown();
+            }
+            None => {}
         }
         if let Some(screen) = sc.screen() {
             if let Some(s) = screen.state.get(name) {
@@ -913,6 +937,21 @@ impl<'a> Checker<'a> {
             },
             _ => return self.not_action(e.span),
         };
+        if let Some(ty) = sc.component_param(name) {
+            if !matches!(ty, ComponentParamType::Action) {
+                return self.not_action(name_span);
+            }
+            if args.is_some() {
+                self.error(
+                    "V3016",
+                    "Action参数不接受实参",
+                    e.span,
+                    format!("改为`{name}`"),
+                );
+                return None;
+            }
+            return Some(ActionRef::Param(name.to_string()));
+        }
         let Some(info) = screen.and_then(|s| s.actions.get(name)) else {
             if screen.is_some_and(|s| s.state.contains_key(name) || s.computed.contains_key(name)) {
                 return self.not_action(name_span);
@@ -1044,6 +1083,11 @@ impl<'a> Checker<'a> {
                     }
                 }
             }
+            A::Ident(n)
+                if matches!(sc.component_param(n), Some(ComponentParamType::Binding(_))) =>
+            {
+                (n.as_str(), e.span)
+            }
             A::Ident(n) if screen.is_some_and(|s| s.state.contains_key(n)) => {
                 self.diags.push(
                     Diagnostic::error("V3017", "双向绑定需要写成bind(...)")
@@ -1062,6 +1106,22 @@ impl<'a> Checker<'a> {
             }
         };
         let (name, span) = target;
+        if let Some(pty) = sc.component_param(name) {
+            return match pty {
+                ComponentParamType::Binding(t) if t == ty => Some(BindingRef::Param {
+                    name: name.to_string(),
+                    ty: t.clone(),
+                }),
+                ComponentParamType::Binding(t) => {
+                    self.mismatch(span, ty, t);
+                    None
+                }
+                _ => {
+                    self.error("V3012", format!("参数`{name}`不是Binding"), span, "");
+                    None
+                }
+            };
+        }
         let Some(screen) = screen else {
             self.error("V1010", format!("未定义的名称`{name}`"), span, "");
             return None;

@@ -18,6 +18,7 @@ struct ScheduleView<ViewModel: ScheduleViewModelContract>: View {
                 Text(L10n.scheduleCount(count: viewModel.state.count, filter: viewModel.state.subtitle))
                     .foregroundStyle(.secondary)
                 TextField(L10n.scheduleSearch, text: Binding(get: { viewModel.state.query }, set: { viewModel.setQuery($0) }))
+                SearchBar(text: Binding(get: { viewModel.state.query }, set: { viewModel.setQuery($0) }), placeholder: "搜索")
                 SecureField(String("密码"), text: Binding(get: { viewModel.state.password }, set: { viewModel.setPassword($0) }))
                 Toggle(L10n.scheduleNotify, isOn: Binding(get: { viewModel.state.notify }, set: { viewModel.setNotify($0) }))
                 Slider(value: Binding(get: { viewModel.state.volume }, set: { viewModel.setVolume($0) }), in: 0.0...1.0)
@@ -50,6 +51,9 @@ struct ScheduleView<ViewModel: ScheduleViewModelContract>: View {
                         .onTapGesture { viewModel.openCourse(id: course.id) }
                         .accessibilityLabel(course.name)
                     }
+                }
+                ForEach(viewModel.state.items, id: \.id) { course in
+                    CourseCard(course: course, note: nil, onTap: { viewModel.openCourse(id: course.id) })
                 }
                 Divider()
                 ZStack(alignment: .bottomTrailing) {

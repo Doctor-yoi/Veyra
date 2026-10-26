@@ -23,7 +23,7 @@ use std::path::PathBuf;
 use serde::Deserialize;
 use veyra_codegen::{Backend, BackendInput, CodeWriter, GENERATED_NOTICE, OutputFile, camel_case};
 use veyra_diagnostics::{Diagnostic, Diagnostics};
-use veyra_ir::{Platform, Program};
+use veyra_ir::{ComponentParamType, Platform, Program};
 
 use crate::swift::ident;
 
@@ -114,6 +114,12 @@ impl Backend for SwiftUiBackend {
             l10n::xcstrings(input.catalog),
         ));
 
+        if !program.components.is_empty() {
+            files.push(OutputFile::generated(
+                out.join("Components.generated.swift"),
+                components(program),
+            ));
+        }
         for s in &program.screens {
             let dir = out.join("Screens").join(&s.name);
             let file = |suffix: &str| dir.join(format!("{}{suffix}.generated.swift", s.name));
@@ -254,4 +260,38 @@ fn dependencies(program: &Program) -> String {
 /// 字段默认值
 pub(crate) fn default_value(e: &veyra_ir::Expr) -> String {
     swift::expr(swift::ExprCx { state: "" }, e)
+}
+
+fn components(program: &Program) -> String {
+    let mut w = CodeWriter::new("    ");
+    header(&mut w, &["SwiftUI"]);
+    for c in &program.components {
+        w.block(format!("struct {}: View {{", c.name), "}", |w| {
+            for p in &c.params {
+                match &p.ty {
+                    ComponentParamType::Value(t) => {
+                        w.line(format!("let {}: {}", ident(&p.name), swift::ty(t)))
+                    }
+                    ComponentParamType::Action => {
+                        w.line(format!("let {}: () -> Void", ident(&p.name)))
+                    }
+                    ComponentParamType::Binding(t) => {
+                        w.line(format!("@Binding var {}: {}", ident(&p.name), swift::ty(t)))
+                    }
+                }
+            }
+            if !c.params.is_empty() {
+                w.blank();
+            }
+            w.block("var body: some View {", "}", |w| {
+                let cx = view::ViewCx {
+                    expr: swift::ExprCx { state: "" },
+                    vm: "",
+                };
+                view::nodes(w, cx, &c.body);
+            });
+        });
+        w.blank();
+    }
+    w.finish()
 }

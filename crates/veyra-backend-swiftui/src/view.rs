@@ -110,8 +110,25 @@ fn number(cx: ViewCx, v: Option<&Value>) -> Option<String> {
 }
 
 fn element(w: &mut CodeWriter, cx: ViewCx, el: &Element) {
-    let ElementKind::Builtin(b) = &el.kind else {
-        return;
+    let b = match &el.kind {
+        ElementKind::Builtin(b) => b,
+        ElementKind::Component(name) => {
+            // 按声明顺序传参，与结构体的成员构造器一致
+            let args: Vec<_> = el
+                .args
+                .iter()
+                .map(|(n, v)| {
+                    let value = match v {
+                        Value::Expr(x) => swift::expr(cx.expr, x),
+                        Value::Action(_) => format!("{{ {} }}", action(cx, Some(v))),
+                        Value::Binding(_) => binding(cx, Some(v)),
+                        Value::KeyPath(_) | Value::Token(_) => String::new(),
+                    };
+                    format!("{}: {value}", swift::ident(n))
+                })
+                .collect();
+            return leaf(w, cx, format!("{name}({})", args.join(", ")), el);
+        }
     };
     let arg = |n: &str| el.arg(n);
     match b {

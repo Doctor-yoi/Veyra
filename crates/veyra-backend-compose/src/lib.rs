@@ -24,7 +24,7 @@ use std::path::PathBuf;
 use serde::Deserialize;
 use veyra_codegen::{Backend, BackendInput, CodeWriter, GENERATED_NOTICE, OutputFile, camel_case};
 use veyra_diagnostics::{Diagnostic, Diagnostics};
-use veyra_ir::{Platform, Program};
+use veyra_ir::{ComponentParamType, Platform, Program};
 
 use crate::kotlin::{Imports, ident};
 
@@ -146,6 +146,12 @@ impl Backend for ComposeBackend {
         }
         files.extend(resources::strings(input.catalog, &options.res)?);
 
+        if !program.components.is_empty() {
+            files.push(OutputFile::generated(
+                file("Components"),
+                components(program, &options),
+            ));
+        }
         for s in &program.screens {
             files.push(OutputFile::generated(
                 file(&format!("{}UiState", s.name)),
@@ -319,4 +325,53 @@ internal fun veyraFormatDate(value: Instant, date: FormatStyle? = null, time: Fo
 }
 "#;
     generated(&options.package, &im, body)
+}
+
+fn components(program: &Program, options: &Options) -> String {
+    let mut im = Imports::new(options.r_package());
+    im.add("androidx.compose.runtime.Composable");
+    im.add("androidx.compose.ui.Modifier");
+    let mut w = CodeWriter::new("    ");
+    for c in &program.components {
+        w.line("@Composable");
+        w.line(format!("fun {}(", c.name));
+        w.indent();
+        for p in &c.params {
+            let name = ident(&p.name);
+            match &p.ty {
+                ComponentParamType::Value(t) => {
+                    w.line(format!("{name}: {},", kotlin::ty(t, &mut im)))
+                }
+                ComponentParamType::Action => w.line(format!("{name}: () -> Unit,")),
+                ComponentParamType::Binding(t) => {
+                    let t = kotlin::ty(t, &mut im);
+                    w.line(format!("{name}: {t},"));
+                    w.line(format!(
+                        "on{}Change: ({t}) -> Unit,",
+                        veyra_codegen::pascal_case(&p.name)
+                    ));
+                }
+            }
+        }
+        w.line("modifier: Modifier = Modifier,");
+        w.dedent();
+        w.line(") {");
+        w.indent();
+        let mut em = view::ViewEmitter {
+            cx: kotlin::ExprCx { state: "" },
+            actions: "",
+            im: &mut im,
+            temp: 0,
+        };
+        match c.body.as_slice() {
+            [veyra_ir::ViewNode::Element(root)] => {
+                em.element(&mut w, root, view::Parent::Other, Some("modifier"))
+            }
+            nodes => em.nodes(&mut w, nodes, view::Parent::Other),
+        }
+        w.dedent();
+        w.line("}");
+        w.blank();
+    }
+    generated(&options.package, &im, &w.finish())
 }

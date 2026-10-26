@@ -15,6 +15,7 @@
 
 mod catalog;
 mod cfg;
+mod component;
 mod decls;
 mod expr;
 mod screen;
@@ -22,7 +23,7 @@ mod view;
 
 use indexmap::IndexMap;
 use veyra_diagnostics::{Diagnostic, Diagnostics, Span};
-use veyra_ir::{EnumDef, LocString, ModelDef, Platform, Program, RepositoryDef};
+use veyra_ir::{ComponentParam, EnumDef, LocString, ModelDef, Platform, Program, RepositoryDef};
 use veyra_syntax::ast;
 
 use crate::cfg::Cfg;
@@ -68,6 +69,7 @@ pub(crate) enum Global<'a> {
     Model(&'a ast::ModelDecl),
     Repository(&'a ast::RepositoryDecl),
     Screen(&'a ast::ScreenDecl),
+    Component(&'a ast::ComponentDecl),
     Unsupported,
 }
 
@@ -78,6 +80,8 @@ pub(crate) struct Checker<'a> {
     pub enums: IndexMap<String, EnumDef>,
     pub models: IndexMap<String, ModelDef>,
     pub repositories: IndexMap<String, RepositoryDef>,
+    /// 组件签名
+    pub components: IndexMap<String, Vec<ComponentParam>>,
     pub strings: IndexMap<String, (LocString, Span)>,
 }
 
@@ -90,6 +94,7 @@ impl<'a> Checker<'a> {
             enums: IndexMap::new(),
             models: IndexMap::new(),
             repositories: IndexMap::new(),
+            components: IndexMap::new(),
             strings: IndexMap::new(),
         }
     }
@@ -134,6 +139,8 @@ impl<'a> Checker<'a> {
             }
         }
         self.check_decls();
+        self.check_component_signatures();
+        let components = self.check_components();
         let screens = self.check_screens();
         let mut strings: Vec<LocString> = self.strings.values().map(|(s, _)| s.clone()).collect();
         strings.sort_by(|a, b| a.key.cmp(&b.key));
@@ -141,7 +148,7 @@ impl<'a> Checker<'a> {
             enums: self.enums.values().cloned().collect(),
             models: self.models.values().cloned().collect(),
             repositories: self.repositories.values().cloned().collect(),
-            components: Vec::new(),
+            components,
             screens,
             strings,
         }
@@ -154,6 +161,7 @@ impl<'a> Checker<'a> {
             ast::Item::Model(d) => Global::Model(d),
             ast::Item::Repository(d) => Global::Repository(d),
             ast::Item::Screen(d) => Global::Screen(d),
+            ast::Item::Component(d) => Global::Component(d),
             _ => {
                 self.unsupported(&format!("`{}`声明", item.keyword()), name.span);
                 Global::Unsupported
