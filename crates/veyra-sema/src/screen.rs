@@ -339,6 +339,8 @@ impl<'a> Checker<'a> {
                     refs(b, out);
                 }
                 ExprKind::Loc { args, .. } => args.iter().for_each(|(_, v)| refs(v, out)),
+                ExprKind::Plural { count, .. } => refs(count, out),
+                ExprKind::Format { value, .. } => refs(value, out),
                 _ => {}
             }
         }

@@ -1,0 +1,26 @@
+// 复数与格式化
+screen Cart {
+  state {
+    count: Int = 0
+    price: Double = 0
+    name: String = ""
+  }
+  computed {
+    label: String = plural("cart.items", count, other: "{count}件")
+    priceText: String = format(price, .currency("CNY"))
+  }
+  view {
+    Column {
+      Text(plural("cart.items", count, one: "{count}件"))
+      Text(plural("cart.total", count, other: "{count}件{name}", few: "x"))
+      Text(plural("cart.size", name, other: "{count}"))
+      Text(plural("cart.bad", count, other: "{count}", dual: "x"))
+      Text(format(name, .number))
+      Text(format(count, .percent))
+      Text(format(price, .currency("rmb")))
+      Text(format(price, .date(.tiny)))
+      Text(format(price, .weird))
+      Text(format(price))
+    }
+  }
+}

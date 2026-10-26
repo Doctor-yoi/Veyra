@@ -63,6 +63,29 @@ impl Program {
     pub fn model(&self, name: &str) -> Option<&ModelDef> {
         self.models.iter().find(|m| m.name == name)
     }
+
+    /// 遍历程序中的全部表达式
+    pub fn walk_exprs(&self, f: &mut dyn FnMut(&Expr)) {
+        for s in &self.screens {
+            s.state.iter().for_each(|x| x.default.walk(f));
+            s.computed.iter().for_each(|x| x.expr.walk(f));
+            for h in &s.lifecycle {
+                if let ActionRef::Dispatch { args, .. } = &h.action {
+                    args.iter().for_each(|(_, v)| v.walk(f));
+                }
+            }
+            s.view.iter().for_each(|n| n.walk_exprs(f));
+        }
+        for c in &self.components {
+            c.body.iter().for_each(|n| n.walk_exprs(f));
+        }
+    }
+
+    pub fn any_expr(&self, pred: impl Fn(&Expr) -> bool) -> bool {
+        let mut found = false;
+        self.walk_exprs(&mut |e| found |= pred(e));
+        found
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

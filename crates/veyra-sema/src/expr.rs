@@ -369,10 +369,8 @@ impl<'a> Checker<'a> {
     fn call(&mut self, sc: &Scope, callee: &ast::Expr, args: &[Arg], span: Span) -> ir::Expr {
         match &callee.kind {
             A::Ident(n) if n == "loc" => return self.loc(sc, args, span),
-            A::Ident(n) if n == "plural" || n == "format" || n == "now" => {
-                self.unsupported(&format!("`{n}()`"), callee.span);
-                return ir::Expr::unknown();
-            }
+            A::Ident(n) if n == "plural" => return self.plural(sc, args, span),
+            A::Ident(n) if n == "format" => return self.format(sc, args, span),
             A::Ident(n) if n == "bind" => {
                 self.error(
                     "V3013",
@@ -650,6 +648,242 @@ impl<'a> Checker<'a> {
             key_span,
         );
         ir::Expr::new(ExprKind::Loc { key, args: ir_args }, Type::String)
+    }
+
+    /// `plural("key", count, other: "共{count}项", one: "...")`
+    fn plural(&mut self, sc: &Scope, args: &[Arg], span: Span) -> ir::Expr {
+        if !sc.allow_loc {
+            self.error("V4005", "plural只能在view中使用", span, "");
+            return ir::Expr::unknown();
+        }
+        let key = match args.first() {
+            Some(Arg {
+                label: None,
+                value:
+                    ast::Expr {
+                        kind: A::Str(s, _),
+                        span,
+                    },
+                ..
+            }) => (s.clone(), *span),
+            _ => {
+                self.error(
+                    "V4002",
+                    "plural的第1个参数必须是字符串字面量的key",
+                    span,
+                    "",
+                );
+                return ir::Expr::unknown();
+            }
+        };
+        let (key, key_span) = key;
+        if !valid_loc_key(&key) {
+            self.error("V4002", format!("无效的本地化key`{key}`"), key_span, "");
+        }
+        let Some(Arg {
+            label: None,
+            value: count_expr,
+            ..
+        }) = args.get(1)
+        else {
+            self.error(
+                "V4008",
+                "plural的第2个参数必须是数量",
+                span,
+                "例如`plural(\"cart.items\", items.count, other: \"{count}件\")`",
+            );
+            return ir::Expr::unknown();
+        };
+        let count = self.expr(sc, count_expr, Some(&Type::Int));
+        let mut forms = IndexMap::new();
+        for arg in &args[2..] {
+            let Some(label) = &arg.label else {
+                self.error(
+                    "V4008",
+                    "复数形式必须带类别名称",
+                    arg.span,
+                    "例如`other: \"...\"`",
+                );
+                continue;
+            };
+            if !veyra_ir::PLURAL_CATEGORIES.contains(&label.name.as_str()) {
+                self.diags.push(
+                    Diagnostic::error("V4009", format!("未知的复数类别`{}`", label.name))
+                        .with_label(label.span, "")
+                        .with_note(format!(
+                            "可用类别：{}",
+                            veyra_ir::PLURAL_CATEGORIES.join("、")
+                        )),
+                );
+                continue;
+            }
+            let A::Str(text, _) = &arg.value.kind else {
+                self.error("V4008", "复数形式必须是字符串字面量", arg.value.span, "");
+                continue;
+            };
+            match parse_template(text) {
+                Ok(segs) => {
+                    for seg in segs {
+                        if let Segment::Arg(n) = seg
+                            && n != "count"
+                        {
+                            self.error(
+                                "V4007",
+                                format!("复数文案只能使用`{{count}}`占位符，不能使用`{{{n}}}`"),
+                                arg.value.span,
+                                "",
+                            );
+                        }
+                    }
+                }
+                Err(msg) => self.error("V4004", msg, arg.value.span, ""),
+            }
+            forms.insert(label.name.clone(), text.clone());
+        }
+        let Some(other) = forms.get("other").cloned() else {
+            self.error("V4008", "plural必须提供`other`形式", span, "");
+            return ir::Expr::unknown();
+        };
+        let s = LocString {
+            key: key.clone(),
+            source: other,
+            args: vec![LocArg {
+                name: "count".into(),
+                ty: LocArgType::Int,
+            }],
+            plural: Some(veyra_ir::PluralForms { forms }),
+        };
+        self.record_string(s, key_span);
+        ir::Expr::new(
+            ExprKind::Plural {
+                key,
+                count: Box::new(count),
+            },
+            Type::String,
+        )
+    }
+
+    /// `format(value, .number)`
+    fn format(&mut self, sc: &Scope, args: &[Arg], span: Span) -> ir::Expr {
+        let [
+            Arg {
+                label: None, value, ..
+            },
+            Arg {
+                label: None,
+                value: style,
+                ..
+            },
+        ] = args
+        else {
+            self.error(
+                "V2070",
+                "format需要两个位置参数",
+                span,
+                "例如`format(price, .currency(\"CNY\"))`",
+            );
+            return ir::Expr::unknown();
+        };
+        let v = self.expr(sc, value, None);
+        let (name, sargs, name_span) = match &style.kind {
+            A::ImplicitMember(id) => (id.name.as_str(), &[][..], id.span),
+            A::Call(callee, a) => match &callee.kind {
+                A::ImplicitMember(id) => (id.name.as_str(), a.as_slice(), id.span),
+                _ => ("", &[][..], style.span),
+            },
+            _ => ("", &[][..], style.span),
+        };
+        let date_len = |c: &mut Self| -> Option<ir::DateLength> {
+            match sargs {
+                [] => Some(ir::DateLength::Medium),
+                [
+                    Arg {
+                        label: None,
+                        value:
+                            ast::Expr {
+                                kind: A::ImplicitMember(id),
+                                ..
+                            },
+                        ..
+                    },
+                ] if ir::DateLength::from_name(&id.name).is_some() => {
+                    ir::DateLength::from_name(&id.name)
+                }
+                _ => {
+                    c.error(
+                        "V2071",
+                        "日期样式需要`.short`、`.medium`、`.long`或`.full`",
+                        style.span,
+                        "",
+                    );
+                    None
+                }
+            }
+        };
+        let (fmt, accepts): (Option<ir::FormatStyle>, fn(&Type) -> bool) = match name {
+            "number" => (Some(ir::FormatStyle::Number), Type::is_numeric),
+            "percent" => (Some(ir::FormatStyle::Percent), |t| *t == Type::Double),
+            "currency" => match sargs {
+                [
+                    Arg {
+                        label: None,
+                        value:
+                            ast::Expr {
+                                kind: A::Str(code, _),
+                                ..
+                            },
+                        ..
+                    },
+                ] if code.len() == 3 && code.chars().all(|c| c.is_ascii_uppercase()) => (
+                    Some(ir::FormatStyle::Currency(code.clone())),
+                    Type::is_numeric,
+                ),
+                _ => {
+                    self.error(
+                        "V2071",
+                        "currency需要ISO 4217货币代码",
+                        style.span,
+                        "例如`.currency(\"CNY\")`",
+                    );
+                    (None, Type::is_numeric)
+                }
+            },
+            "date" => (date_len(self).map(ir::FormatStyle::Date), |t| {
+                *t == Type::Date
+            }),
+            "time" => (date_len(self).map(ir::FormatStyle::Time), |t| {
+                *t == Type::Date
+            }),
+            "dateTime" => (date_len(self).map(ir::FormatStyle::DateTime), |t| {
+                *t == Type::Date
+            }),
+            _ => {
+                self.diags.push(
+                    Diagnostic::error("V2071", "无效的格式样式")
+                        .with_label(name_span, "")
+                        .with_note("可用样式：.number、.percent、.currency(\"CNY\")、.date、.time、.dateTime"),
+                );
+                (None, Type::is_numeric)
+            }
+        };
+        let Some(fmt) = fmt else {
+            return ir::Expr::unknown();
+        };
+        if !v.ty.is_unknown() && !accepts(&v.ty) {
+            self.error(
+                "V2072",
+                format!("该格式样式不能用于`{}`", v.ty),
+                value.span,
+                "",
+            );
+        }
+        ir::Expr::new(
+            ExprKind::Format {
+                value: Box::new(v),
+                style: fmt,
+            },
+            Type::String,
+        )
     }
 
     pub(crate) fn record_string(&mut self, s: LocString, span: Span) {
