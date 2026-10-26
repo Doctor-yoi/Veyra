@@ -1,8 +1,14 @@
 package com.example.schedule.data
 
+import android.content.Context
 import com.example.schedule.ui.Course
+import android.content.Context
 import com.example.schedule.ui.CourseKind
+import android.content.Context
 import com.example.schedule.ui.CourseRepository
+import com.example.schedule.ui.NoteStore
+import com.example.schedule.ui.VeyraDatabase
+import com.example.schedule.ui.VeyraStores
 import com.example.schedule.ui.VeyraDependencies
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -18,6 +24,9 @@ class InMemoryCourseRepository : CourseRepository {
     override fun observeCourses(): Flow<List<Course>> = flowOf(courses)
 }
 
-class AppDependencies : VeyraDependencies {
+class AppDependencies(context: Context) : VeyraDependencies {
+    private val stores = VeyraStores(VeyraDatabase.build(context))
+
     override val courseRepository: CourseRepository = InMemoryCourseRepository()
+    override val noteStore: NoteStore = stores.noteStore
 }

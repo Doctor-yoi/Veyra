@@ -10,7 +10,7 @@ import com.example.schedule.ui.LocalVeyraDependencies
 import com.example.schedule.ui.ScheduleRoute
 
 class MainActivity : ComponentActivity() {
-    private val dependencies = AppDependencies()
+    private val dependencies by lazy { AppDependencies(applicationContext) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

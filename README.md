@@ -74,10 +74,31 @@ Declarations:
 | --- | --- |
 | `enum`, `model` | Value types shared by all layers |
 | `repository` | Data access contract, implemented natively on each platform |
+| `entity`, `store` | Persistent data and its data access object |
 | `component` | Reusable view without business state, taking values, `Action` and `Binding<T>` parameters |
 | `screen` | A page with `inject`, `state`, `computed`, `actions`, `effects`, `lifecycle` and `view` |
 
 `effects` declares one-off events such as navigation. The view model emits them with `emit`, and the root view or route receives them through `onEffect`, so views never handle them. `lifecycle` dispatches actions when a screen appears or disappears.
+
+Persistent data is declared once and generated for SwiftData and Room:
+
+```
+entity Note @persistent {
+  id: String @primaryKey
+  courseId: String @indexed
+  text: String
+  createdAt: Date
+}
+
+store NoteStore for Note {
+  query forCourse(course: String) -> Stream<List<Note>> {
+    where courseId == course
+    orderBy createdAt desc
+  }
+}
+```
+
+Every store provides `all`, `find`, `save` and `delete`, plus the declared queries. Conditions support comparisons, `contains`, `nil` checks, Bool fields, `&&`, `||` and `!`, and compile to `#Predicate` on iOS and SQL on Android. Returning `Stream<List<T>>` observes changes, while `List<T>` and `T?` read once. Views and view models only see the value type `Note`, never the persistent `NoteEntity`. `VeyraStorage` and `VeyraStores` set up the SwiftData container, while `VeyraDatabase` and `VeyraStores` set up Room. On Android, increase `database_version` under `[compose]` and add migrations to the generated `VeyraMigrations.kt` when the schema changes.
 
 Conditional compilation selects platform-specific content. Platform conditions and custom flags declared in `[flags]` are resolved at compile time, and each platform is type checked separately:
 
