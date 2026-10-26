@@ -15,6 +15,7 @@
 
 mod l10n;
 mod screen;
+mod storage;
 mod swift;
 mod view;
 
@@ -125,6 +126,25 @@ impl Backend for SwiftUiBackend {
             l10n::xcstrings(input.catalog),
         ));
 
+        if !program.entities.is_empty() {
+            let dir = out.join("Storage");
+            for e in &program.entities {
+                files.push(OutputFile::generated(
+                    dir.join(format!("{}Entity.generated.swift", e.name)),
+                    storage::entity(e, program),
+                ));
+            }
+            for st in &program.stores {
+                files.push(OutputFile::generated(
+                    dir.join(format!("{}.generated.swift", st.name)),
+                    storage::store(st, program),
+                ));
+            }
+            files.push(OutputFile::generated(
+                dir.join("VeyraStorage.generated.swift"),
+                storage::support(program),
+            ));
+        }
         if !program.components.is_empty() {
             files.push(OutputFile::generated(
                 out.join("Components.generated.swift"),

@@ -17,6 +17,7 @@
 mod kotlin;
 mod resources;
 mod screen;
+mod storage;
 mod view;
 
 use std::path::PathBuf;
@@ -54,6 +55,10 @@ pub struct Options {
     /// R类所在的包名，默认与package相同
     pub r_package: Option<String>,
     pub di: Di,
+    /// Room数据库文件名
+    pub database: String,
+    /// Room数据库版本，表结构变化时递增
+    pub database_version: u32,
 }
 
 impl Default for Options {
@@ -65,6 +70,8 @@ impl Default for Options {
             package: "com.example.app.ui".into(),
             r_package: None,
             di: Di::Manual,
+            database: "veyra.db".into(),
+            database_version: 1,
         }
     }
 }
@@ -148,6 +155,28 @@ impl Backend for ComposeBackend {
         }
         files.extend(resources::strings(input.catalog, &options.res)?);
 
+        if !program.entities.is_empty() {
+            for e in &program.entities {
+                files.push(OutputFile::generated(
+                    file(&format!("{}Entity", e.name)),
+                    storage::entity(e, &options),
+                ));
+            }
+            for st in &program.stores {
+                files.push(OutputFile::generated(
+                    file(&st.name),
+                    storage::store(st, program, &options),
+                ));
+            }
+            files.push(OutputFile::generated(
+                file("VeyraDatabase"),
+                storage::database(program, &options),
+            ));
+            files.push(OutputFile::user_owned(
+                user_dir.join("VeyraMigrations.kt"),
+                storage::migrations(&options),
+            ));
+        }
         if !program.components.is_empty() {
             files.push(OutputFile::generated(
                 file("Components"),

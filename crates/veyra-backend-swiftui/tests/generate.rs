@@ -96,3 +96,40 @@ fn generates_with_di_option() {
         }
     }
 }
+
+#[test]
+fn generates_storage() {
+    let src = include_str!("storage.vey");
+    let parsed = veyra_syntax::parse(Default::default(), src);
+    assert!(parsed.diagnostics.is_empty());
+    let analysis = analyze(&[parsed.file], &Target::new(Platform::Ios));
+    assert!(
+        analysis.diagnostics.is_empty(),
+        "{:?}",
+        analysis.diagnostics
+    );
+    let catalog = Catalog {
+        source_locale: "en".into(),
+        target_locales: Vec::new(),
+        entries: Vec::new(),
+    };
+    let options: toml::Table = toml::from_str("").unwrap();
+    let files = SwiftUiBackend
+        .generate(&BackendInput {
+            program: &analysis.program,
+            catalog: &catalog,
+            options: &options,
+        })
+        .unwrap();
+    if let Ok(dir) = std::env::var("VEYRA_DUMP_STORAGE") {
+        for f in &files {
+            let path = std::path::Path::new(&dir).join(&f.path);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, &f.contents).unwrap();
+        }
+    }
+    for f in files {
+        let name = f.path.to_string_lossy().replace('/', "__");
+        insta::assert_snapshot!(format!("storage__{name}"), f.contents);
+    }
+}

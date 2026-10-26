@@ -19,11 +19,15 @@ mod component;
 mod decls;
 mod expr;
 mod screen;
+mod storage;
 mod view;
 
 use indexmap::IndexMap;
 use veyra_diagnostics::{Diagnostic, Diagnostics, Span};
-use veyra_ir::{ComponentParam, EnumDef, LocString, ModelDef, Platform, Program, RepositoryDef};
+use veyra_ir::{
+    ComponentParam, EntityDef, EnumDef, LocString, ModelDef, Platform, Program, RepositoryDef,
+    StoreDef,
+};
 use veyra_syntax::ast;
 
 use crate::cfg::Cfg;
@@ -70,6 +74,8 @@ pub(crate) enum Global<'a> {
     Repository(&'a ast::RepositoryDecl),
     Screen(&'a ast::ScreenDecl),
     Component(&'a ast::ComponentDecl),
+    Entity(&'a ast::EntityDecl),
+    Store(&'a ast::StoreDecl),
     Unsupported,
 }
 
@@ -80,6 +86,8 @@ pub(crate) struct Checker<'a> {
     pub enums: IndexMap<String, EnumDef>,
     pub models: IndexMap<String, ModelDef>,
     pub repositories: IndexMap<String, RepositoryDef>,
+    pub entities: IndexMap<String, EntityDef>,
+    pub stores: IndexMap<String, StoreDef>,
     /// 组件签名
     pub components: IndexMap<String, Vec<ComponentParam>>,
     pub strings: IndexMap<String, (LocString, Span)>,
@@ -94,6 +102,8 @@ impl<'a> Checker<'a> {
             enums: IndexMap::new(),
             models: IndexMap::new(),
             repositories: IndexMap::new(),
+            entities: IndexMap::new(),
+            stores: IndexMap::new(),
             components: IndexMap::new(),
             strings: IndexMap::new(),
         }
@@ -148,6 +158,8 @@ impl<'a> Checker<'a> {
             enums: self.enums.values().cloned().collect(),
             models: self.models.values().cloned().collect(),
             repositories: self.repositories.values().cloned().collect(),
+            entities: self.entities.values().cloned().collect(),
+            stores: self.stores.values().cloned().collect(),
             components,
             screens,
             strings,
@@ -162,6 +174,8 @@ impl<'a> Checker<'a> {
             ast::Item::Repository(d) => Global::Repository(d),
             ast::Item::Screen(d) => Global::Screen(d),
             ast::Item::Component(d) => Global::Component(d),
+            ast::Item::Entity(d) => Global::Entity(d),
+            ast::Item::Store(d) => Global::Store(d),
             _ => {
                 self.unsupported(&format!("`{}`声明", item.keyword()), name.span);
                 Global::Unsupported
@@ -173,6 +187,14 @@ impl<'a> Checker<'a> {
                 format!("`{}`是内置类型名称", name.name),
                 name.span,
                 "请换一个名称",
+            );
+            return;
+        }
+        if PLATFORM_TYPES.contains(&name.name.as_str()) {
+            self.diags.push(
+                Diagnostic::error("V1002", format!("`{}`与平台SDK中的类型同名", name.name))
+                    .with_label(name.span, "请换一个名称")
+                    .with_note("生成的Swift或Kotlin代码会直接使用这些平台类型"),
             );
             return;
         }
@@ -210,6 +232,55 @@ impl<'a> Checker<'a> {
         }
     }
 }
+
+/// 生成代码会用到的平台类型，用户声明不能与之同名
+const PLATFORM_TYPES: &[&str] = &[
+    "Any",
+    "Array",
+    "Binding",
+    "Box",
+    "Button",
+    "Color",
+    "Column",
+    "Composable",
+    "Container",
+    "Data",
+    "Dictionary",
+    "Divider",
+    "Environment",
+    "Error",
+    "Factory",
+    "Flow",
+    "Font",
+    "ForEach",
+    "Group",
+    "Image",
+    "Instant",
+    "Label",
+    "Modifier",
+    "Never",
+    "Nothing",
+    "Observable",
+    "Optional",
+    "Pair",
+    "Result",
+    "Row",
+    "Schema",
+    "ScrollView",
+    "Set",
+    "Slider",
+    "Spacer",
+    "State",
+    "Task",
+    "Text",
+    "Toggle",
+    "Triple",
+    "UUID",
+    "Unit",
+    "URL",
+    "View",
+    "ViewModel",
+];
 
 pub(crate) fn is_builtin_type(name: &str) -> bool {
     matches!(

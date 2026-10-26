@@ -1,0 +1,26 @@
+---
+source: crates/veyra-backend-swiftui/tests/generate.rs
+expression: f.contents
+---
+// This file is created by Veyra and will not be overwritten
+
+import Foundation
+
+@MainActor
+final class TodosViewModel: TodosViewModelContract {
+    let state = TodosState()
+
+    private let todos: any TodoStore
+
+    init(todos: any TodoStore) {
+        self.todos = todos
+    }
+
+    func load() async {
+        // Implement business logic here
+    }
+
+    func toggle(id: String) async {
+        // Implement business logic here
+    }
+}

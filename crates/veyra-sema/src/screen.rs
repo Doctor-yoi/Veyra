@@ -67,10 +67,18 @@ impl<'a> Checker<'a> {
                                 kind: InjectKind::Repository,
                             });
                         }
+                        Some(Global::Store(_)) => {
+                            info.injects.insert(inj.name.name.clone());
+                            injects.push(InjectDef {
+                                name: inj.name.name.clone(),
+                                ty: inj.ty.name.clone(),
+                                kind: InjectKind::Store,
+                            });
+                        }
                         Some(_) => self.diags.push(
                             Diagnostic::error("V3008", format!("`{}`不能被注入", inj.ty.name))
                                 .with_label(inj.ty.span, "")
-                                .with_note("只有repository可以被注入到ViewModel"),
+                                .with_note("只有repository与store可以被注入到ViewModel"),
                         ),
                         None => self.error(
                             "V1010",

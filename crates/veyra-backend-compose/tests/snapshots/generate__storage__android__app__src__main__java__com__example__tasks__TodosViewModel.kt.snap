@@ -1,0 +1,26 @@
+---
+source: crates/veyra-backend-compose/tests/generate.rs
+expression: f.contents
+---
+// This file is created by Veyra and will not be overwritten
+
+package com.example.tasks
+
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
+
+class TodosViewModel(
+    private val todos: TodoStore,
+) : TodosViewModelBase() {
+    override fun load() {
+        viewModelScope.launch {
+            // Implement business logic here
+        }
+    }
+
+    override fun toggle(id: String) {
+        viewModelScope.launch {
+            // Implement business logic here
+        }
+    }
+}

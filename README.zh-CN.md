@@ -74,10 +74,31 @@ View不能调用任意函数、修改状态或访问注入的依赖，有副作�
 | --- | --- |
 | `enum`、`model` | 各层共享的值类型 |
 | `repository` | 数据访问契约，由各平台原生实现 |
+| `entity`、`store` | 持久化数据及其数据访问对象 |
 | `component` | 不含业务状态的可复用视图，参数可以是值、`Action`与`Binding<T>` |
 | `screen` | 页面，包含`inject`、`state`、`computed`、`actions`、`effects`、`lifecycle`与`view` |
 
 `effects`声明导航等一次性事件，由ViewModel通过`emit`发出，组装层通过`onEffect`接收，View本身不处理。`lifecycle`在页面出现或消失时分发action。
+
+持久化数据只需声明一次，即可同时生成SwiftData与Room代码：
+
+```
+entity Note @persistent {
+  id: String @primaryKey
+  courseId: String @indexed
+  text: String
+  createdAt: Date
+}
+
+store NoteStore for Note {
+  query forCourse(course: String) -> Stream<List<Note>> {
+    where courseId == course
+    orderBy createdAt desc
+  }
+}
+```
+
+每个store自动提供`all`、`find`、`save`与`delete`，以及声明的查询。查询条件支持比较运算、`contains`、与`nil`比较、Bool字段、`&&`、`||`与`!`，在iOS上编译为`#Predicate`，在Android上编译为SQL。返回`Stream<List<T>>`时持续观察变化，返回`List<T>`或`T?`时只读取一次。View与ViewModel只接触值类型`Note`，不会拿到持久化类型`NoteEntity`。iOS上`VeyraStorage`与`VeyraStores`负责创建SwiftData容器，Android上对应`VeyraDatabase`与`VeyraStores`。Android的表结构变化时，递增`[compose]`中的`database_version`，并在生成的`VeyraMigrations.kt`中添加迁移。
 
 条件编译用于选择平台专属内容。平台条件与`[flags]`中声明的自定义flag在编译期确定，每个平台单独做类型检查：
 

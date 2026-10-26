@@ -1,0 +1,61 @@
+// 课程笔记：本地持久化
+
+entity Note @persistent {
+  id: String @primaryKey
+  courseId: String @indexed
+  text: String
+  pinned: Bool
+  createdAt: Date
+}
+
+store NoteStore for Note {
+  query forCourse(course: String) -> Stream<List<Note>> {
+    where courseId == course
+    orderBy createdAt desc
+  }
+
+  query pinnedNotes() -> List<Note> {
+    where pinned
+    limit 10
+  }
+}
+
+screen Notes {
+  inject notes: NoteStore
+
+  state {
+    courseId: String = ""
+    draft: String = "" @writable
+    items: List<Note> = []
+  }
+
+  computed {
+    canAdd: Bool = !draft.isEmpty
+  }
+
+  actions {
+    start() async
+    add() async
+    remove(id: String) async
+  }
+
+  lifecycle {
+    onAppear: start
+  }
+
+  view {
+    Column(spacing: 12) {
+      TextField(loc("notes.draft", "写点什么"), text: bind(draft))
+      Button(loc("notes.add", "添加"), action: add).disabled(!canAdd)
+      List(items, key: .id) { note in
+        Row {
+          Text(note.text)
+          Spacer()
+          Text(format(note.createdAt, .date(.short))).foreground(.secondary)
+        }
+        .onTap(remove(note.id))
+      }
+    }
+    .padding()
+  }
+}

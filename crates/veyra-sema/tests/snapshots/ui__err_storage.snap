@@ -1,0 +1,133 @@
+---
+source: crates/veyra-sema/tests/ui.rs
+expression: out
+---
+error[V2040]: entity不支持`@cached`
+ --> err_storage.vey:8:25
+  |
+8 | entity Item @persistent @cached {
+  |                         ^^^^^^^
+
+error[V5002]: 主键必须是非可选的String或Int
+ --> err_storage.vey:9:7
+  |
+9 |   id: Double @primaryKey
+  |       ^^^^^^
+
+error[V5001]: entity字段不能是`List<String>`
+  --> err_storage.vey:11:9
+   |
+11 |   tags: List<String>
+   |         ^^^^^^^^^^^^
+   |
+   = note: 可持久化的类型：Bool、Int、Double、String、Date、枚举及其可选类型
+
+error[V5001]: entity字段不能是`Tag?`
+  --> err_storage.vey:12:8
+   |
+12 |   tag: Tag?
+   |        ^^^^
+   |
+   = note: 可持久化的类型：Bool、Int、Double、String、Date、枚举及其可选类型
+
+error[V5003]: entity`NoKey`缺少主键
+  --> err_storage.vey:18:8
+   |
+18 | entity NoKey {
+   |        ^^^^^
+   |
+   = note: 为一个String或Int字段添加@primaryKey
+
+error[V5005]: 查询名称`all`已被使用
+  --> err_storage.vey:23:9
+   |
+23 |   query all() -> List<Item> {}
+   |         ^^^
+   |
+   = note: store自动提供all、find、save与delete
+
+error[V5007]: 查询参数`name`与字段同名
+  --> err_storage.vey:24:9
+   |
+24 |   query byName(name: String) -> List<Item> {
+   |         ^^^^^^
+   |
+   = note: 请给参数换一个名称，避免条件中的名称产生歧义
+
+error[V5008]: 查询的返回类型必须是`Stream<List<Item>>`、`List<Item>`或`Item?`
+  --> err_storage.vey:27:27
+   |
+27 |   query bad(q: String) -> List<Tag> {}
+   |                           ^^^^^^^^^
+
+error[V5013]: 字段`score`不支持大小比较
+  --> err_storage.vey:29:11
+   |
+29 |     where score > n && done < true || level == .c
+   |           ^^^^^^^^^
+   |
+   = note: 可选字段只能与值或nil判断是否相等
+
+error[V5013]: 字段`done`不支持大小比较
+  --> err_storage.vey:29:24
+   |
+29 |     where score > n && done < true || level == .c
+   |                        ^^^^^^^^^^^
+
+error[V1013]: 枚举`Level`没有成员`c`
+  --> err_storage.vey:29:49
+   |
+29 |     where score > n && done < true || level == .c
+   |                                                 ^
+
+error[V5014]: 字段`level`不是String，不能使用contains
+  --> err_storage.vey:32:11
+   |
+32 |     where level.contains(q) && q == "x" && missing
+   |           ^^^^^^^^^^^^^^^^^
+
+error[V5011]: 比较的一侧必须是实体字段
+  --> err_storage.vey:32:32
+   |
+32 |     where level.contains(q) && q == "x" && missing
+   |                                ^^^^^^^^
+
+error[V1010]: `Item`没有字段`missing`
+  --> err_storage.vey:32:44
+   |
+32 |     where level.contains(q) && q == "x" && missing
+   |                                            ^^^^^^^
+
+error[V5016]: 不能按`Bool`排序
+  --> err_storage.vey:33:13
+   |
+33 |     orderBy done
+   |             ^^^^
+   |
+   = note: 排序字段必须是Int、Double、String或Date
+
+error[V5009]: limit必须是正整数字面量
+  --> err_storage.vey:34:11
+   |
+34 |     limit 0
+   |           ^
+
+error[V5009]: 返回单个结果的查询不需要limit
+  --> err_storage.vey:36:3
+   |
+36 |   query one(q: String) -> Item? {
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[V5012]: 字段`level`不是可选类型，不能与nil比较
+  --> err_storage.vey:37:40
+   |
+37 |     where name == q && score == nil && level != nil
+   |                                        ^^^^^^^^^^^^
+
+error[V5004]: `Tag`不是entity
+  --> err_storage.vey:42:20
+   |
+42 | store TagStore for Tag {}
+   |                    ^^^ store只能用于entity
+
+error: 共19个错误，0个警告

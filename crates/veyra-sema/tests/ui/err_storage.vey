@@ -1,0 +1,42 @@
+// 持久化实体与查询
+enum Level { a, b }
+
+model Tag {
+  name: String
+}
+
+entity Item @persistent @cached {
+  id: Double @primaryKey
+  name: String
+  tags: List<String>
+  tag: Tag?
+  level: Level
+  done: Bool
+  score: Int?
+}
+
+entity NoKey {
+  name: String
+}
+
+store ItemStore for Item {
+  query all() -> List<Item> {}
+  query byName(name: String) -> List<Item> {
+    where name == name
+  }
+  query bad(q: String) -> List<Tag> {}
+  query cmp(n: Int) -> List<Item> {
+    where score > n && done < true || level == .c
+  }
+  query misc(q: String) -> Stream<List<Item>> {
+    where level.contains(q) && q == "x" && missing
+    orderBy done
+    limit 0
+  }
+  query one(q: String) -> Item? {
+    where name == q && score == nil && level != nil
+    limit 3
+  }
+}
+
+store TagStore for Tag {}

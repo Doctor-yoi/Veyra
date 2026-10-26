@@ -38,6 +38,22 @@ impl<'a> Checker<'a> {
             }
         }
         for g in &globals {
+            if let Global::Entity(d) = g {
+                self.models.insert(
+                    d.name.name.clone(),
+                    ModelDef {
+                        name: d.name.name.clone(),
+                        fields: Vec::new(),
+                    },
+                );
+            }
+        }
+        for g in &globals {
+            if let Global::Entity(d) = g {
+                self.check_entity(d);
+            }
+        }
+        for g in &globals {
             if let Global::Model(d) = g {
                 let fields = self.check_model_fields(d);
                 if let Some(m) = self.models.get_mut(&d.name.name) {
@@ -50,6 +66,11 @@ impl<'a> Checker<'a> {
             if let Global::Repository(d) = g {
                 let def = self.check_repository(d);
                 self.repositories.insert(def.name.clone(), def);
+            }
+        }
+        for g in &globals {
+            if let Global::Store(d) = g {
+                self.check_store(d);
             }
         }
     }
@@ -279,7 +300,9 @@ impl<'a> Checker<'a> {
                     }
                     other => match self.globals.get(other).map(|(g, _)| *g) {
                         Some(Global::Enum(_)) => Type::Enum(other.to_string()),
-                        Some(Global::Model(_)) => Type::Model(other.to_string()),
+                        Some(Global::Model(_) | Global::Entity(_)) => {
+                            Type::Model(other.to_string())
+                        }
                         Some(_) => {
                             self.error("V2006", format!("`{other}`不是值类型"), name.span, "");
                             return Type::Unknown;
