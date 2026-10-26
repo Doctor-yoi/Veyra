@@ -1,0 +1,81 @@
+---
+source: crates/veyra-sema/tests/ui.rs
+expression: out
+---
+[ios]
+error[V1011]: 未知的组件`ios.Unknown`
+  --> err_platform.vey:13:11
+   |
+13 |       ios.Unknown()
+   |           ^^^^^^^
+   |
+   = note: ios专属组件：ShareLink
+
+error[V1012]: 未知的修饰符`.ios.blur`
+  --> err_platform.vey:14:21
+   |
+14 |       Text("x").ios.blur()
+   |                     ^^^^
+   |
+   = note: ios专属修饰符：glassEffect、navigationTitle、textInputAutocapitalization、listStyle、scrollDismissesKeyboard
+
+error[V1011]: 未知的平台`windows`
+  --> err_platform.vey:16:7
+   |
+16 |       windows.Button()
+   |       ^^^^^^^ 可用的平台：ios、android
+
+error[V6003]: `.font`不能放在`debug`条件中
+  --> err_platform.vey:19:10
+   |
+19 |         .font(.title)
+   |          ^^^^
+   |
+   = note: 该修饰符在Compose中会生成为组件参数，无法按构建类型切换
+
+warning[V6010]: native代码块不受Veyra的类型检查与MVVM约束
+  --> err_platform.vey:22:7
+   |
+22 |       native ios {
+   |       ^^^^^^^^^^^^
+   |
+   = note: 可在veyra.toml的[lint]中设置native = "allow"或"deny"
+
+error[V1010]: 未定义的名称`missing`
+  --> err_platform.vey:23:9
+   |
+23 |         """
+   |         ^^^
+
+error[V6011]: 无效的占位符`{{a b}}`
+  --> err_platform.vey:23:9
+   |
+23 |         """
+   |         ^^^ 占位符只能是名称或字段路径
+
+error: 共6个错误，1个警告
+
+[android]
+error[V6004]: `ios.ShareLink`只能用于ios
+  --> err_platform.vey:11:7
+   |
+11 |       ios.ShareLink("分享", item: title)
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: 请放在`#if ios`条件块中
+
+error[V1011]: 未知的平台`windows`
+  --> err_platform.vey:16:7
+   |
+16 |       windows.Button()
+   |       ^^^^^^^ 可用的平台：ios、android
+
+error[V6003]: `.font`不能放在`debug`条件中
+  --> err_platform.vey:19:10
+   |
+19 |         .font(.title)
+   |          ^^^^
+   |
+   = note: 该修饰符在Compose中会生成为组件参数，无法按构建类型切换
+
+error: 共3个错误，0个警告
