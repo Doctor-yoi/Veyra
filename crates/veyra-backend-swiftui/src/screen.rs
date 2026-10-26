@@ -8,7 +8,7 @@ use veyra_ir::{ActionRef, LifecycleEvent, ScreenDef};
 
 use crate::swift::{self, ExprCx, ident};
 use crate::view::{self, ViewCx};
-use crate::{Options, default_value, dependency_name, header, params};
+use crate::{Di, Options, default_value, dependency_name, header, params};
 
 pub(crate) fn state(s: &ScreenDef) -> String {
     let mut w = CodeWriter::new("    ");
@@ -232,17 +232,19 @@ fn screen_view(w: &mut CodeWriter, s: &ScreenDef, set_effect: bool) {
     w.dedent();
 }
 
-pub(crate) fn root(s: &ScreenDef, _options: &Options) -> String {
+pub(crate) fn root(s: &ScreenDef, options: &Options) -> String {
     let mut w = CodeWriter::new("    ");
     header(&mut w, &["SwiftUI"]);
     let has_effects = !s.effects.is_empty();
+    // FactoryKit模式下ViewModel自行解析依赖，组装层无需读取Environment
+    let from_env = options.di == Di::Manual && !s.injects.is_empty();
     w.line(format!(
         "/// Entry point of {}, creates the view model and injects dependencies",
         s.name
     ));
     w.block(format!("struct {}Root: View {{", s.name), "}", |w| {
-        if s.injects.is_empty() {
-            w.line(format!("@State private var viewModel = {}", construct(s, "")));
+        if !from_env {
+            w.line(format!("@State private var viewModel = {}ViewModel()", s.name));
         } else {
             w.line("@Environment(\\.veyraDependencies) private var dependencies");
             w.line(format!("@State private var viewModel: {}ViewModel?", s.name));
@@ -257,7 +259,7 @@ pub(crate) fn root(s: &ScreenDef, _options: &Options) -> String {
         }
         w.blank();
         w.block("var body: some View {", "}", |w| {
-            if s.injects.is_empty() {
+            if !from_env {
                 screen_view(w, s, has_effects);
                 return;
             }
@@ -287,11 +289,15 @@ pub(crate) fn root(s: &ScreenDef, _options: &Options) -> String {
     w.finish()
 }
 
-pub(crate) fn view_model(s: &ScreenDef, _options: &Options) -> String {
+pub(crate) fn view_model(s: &ScreenDef, options: &Options) -> String {
+    let factory = options.di == Di::Factory;
     let mut w = CodeWriter::new("    ");
     w.line(format!("// {USER_OWNED_NOTICE}"));
     w.blank();
     w.line("import Foundation");
+    if factory && !s.injects.is_empty() {
+        w.line(format!("import {}", options.factory_module));
+    }
     w.blank();
     w.line("@MainActor");
     w.block(
@@ -302,7 +308,16 @@ pub(crate) fn view_model(s: &ScreenDef, _options: &Options) -> String {
             if !s.effects.is_empty() {
                 w.line(format!("var onEffect: (({}Effect) -> Void)?", s.name));
             }
-            if !s.injects.is_empty() {
+            if factory && !s.injects.is_empty() {
+                w.blank();
+                for i in &s.injects {
+                    w.line(format!(
+                        "@Injected(\\.{}) private var {}",
+                        dependency_name(&i.ty),
+                        ident(&i.name)
+                    ));
+                }
+            } else if !s.injects.is_empty() {
                 w.blank();
                 for i in &s.injects {
                     w.line(format!("private let {}: any {}", ident(&i.name), i.ty));
