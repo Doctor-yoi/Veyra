@@ -1,0 +1,22 @@
+// 生命周期与effect
+screen Detail {
+  state {
+    id: String = ""
+  }
+  actions {
+    load(id: String) async
+  }
+  effects {
+    back
+    open(id: String) async
+  }
+  lifecycle {
+    onAppear: load(id)
+    onAppear: load(id)
+    onResume: load
+    onDisappear: back
+  }
+  view {
+    Text(id)
+  }
+}

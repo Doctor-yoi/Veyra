@@ -10,6 +10,7 @@ import Foundation
 @MainActor
 protocol ScheduleViewModelContract: AnyObject {
     var state: ScheduleState { get }
+    var onEffect: ((ScheduleEffect) -> Void)? { get set }
 
     func setQuery(_ value: String)
     func setVolume(_ value: Double)
@@ -18,6 +19,21 @@ protocol ScheduleViewModelContract: AnyObject {
 
     func refresh() async
     func openCourse(id: String)
+    func stop()
+}
+
+/// One-off events emitted by the Schedule view model
+enum ScheduleEffect: Sendable {
+    case navigateToDetail(id: String)
+    case showToast(message: String)
+    case close
+}
+
+extension ScheduleViewModelContract {
+    /// Sends an effect to the root view
+    func emit(_ effect: ScheduleEffect) {
+        onEffect?(effect)
+    }
 }
 
 /// Default setters write state directly, override them in the view model to validate input

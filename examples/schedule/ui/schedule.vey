@@ -23,6 +23,14 @@ screen Schedule {
     openCourse(id: String)
   }
 
+  effects {
+    showCourse(id: String)
+  }
+
+  lifecycle {
+    onAppear: refresh
+  }
+
   view {
     Column(spacing: 12, alignment: .leading) {
       Text(loc("schedule.title", "我的课表")).font(.largeTitle)

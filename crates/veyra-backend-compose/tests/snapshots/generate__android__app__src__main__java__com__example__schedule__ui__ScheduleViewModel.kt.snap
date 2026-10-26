@@ -21,4 +21,8 @@ class ScheduleViewModel(
     override fun openCourse(id: String) {
         // Implement business logic here
     }
+
+    override fun stop() {
+        // Implement business logic here
+    }
 }

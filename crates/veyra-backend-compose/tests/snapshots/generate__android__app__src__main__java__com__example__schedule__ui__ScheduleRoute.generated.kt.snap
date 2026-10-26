@@ -7,16 +7,29 @@ expression: f.contents
 package com.example.schedule.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 /** Entry point of Schedule, creates the view model and collects its state */
 @Composable
-fun ScheduleRoute(modifier: Modifier = Modifier) {
+fun ScheduleRoute(modifier: Modifier = Modifier, onEffect: (ScheduleEffect) -> Unit = {}) {
     val dependencies = LocalVeyraDependencies.current
     val viewModel: ScheduleViewModel = viewModel { ScheduleViewModel(courses = dependencies.courseRepository) }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val currentOnEffect by rememberUpdatedState(onEffect)
+    LaunchedEffect(viewModel) {
+        viewModel.effects.collect { currentOnEffect(it) }
+    }
+    LaunchedEffect(Unit) {
+        viewModel.refresh()
+    }
+    DisposableEffect(Unit) {
+        onDispose { viewModel.stop() }
+    }
     ScheduleContent(state = state, actions = viewModel, modifier = modifier)
 }

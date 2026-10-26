@@ -33,4 +33,12 @@ interface ScheduleActions {
     fun setPassword(value: String)
     fun refresh()
     fun openCourse(id: String)
+    fun stop()
+}
+
+/** One-off events emitted by the Schedule view model */
+sealed interface ScheduleEffect {
+    data class NavigateToDetail(val id: String) : ScheduleEffect
+    data class ShowToast(val message: String) : ScheduleEffect
+    data object Close : ScheduleEffect
 }

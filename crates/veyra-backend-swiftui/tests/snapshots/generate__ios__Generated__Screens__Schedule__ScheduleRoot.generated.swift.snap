@@ -10,17 +10,27 @@ import SwiftUI
 struct ScheduleRoot: View {
     @Environment(\.veyraDependencies) private var dependencies
     @State private var viewModel: ScheduleViewModel?
+    private let onEffect: (ScheduleEffect) -> Void
+
+    /// `onEffect` handles one-off events such as navigation
+    init(onEffect: @escaping (ScheduleEffect) -> Void = { _ in }) {
+        self.onEffect = onEffect
+    }
 
     var body: some View {
         if let viewModel {
             ScheduleView(viewModel: viewModel)
+                .task { await viewModel.refresh() }
+                .onDisappear { viewModel.stop() }
         } else {
             Color.clear.onAppear {
                 guard let dependencies else {
                     assertionFailure("VeyraDependencies is missing, call veyraDependencies(_:) on an ancestor view")
                     return
                 }
-                viewModel = ScheduleViewModel(courses: dependencies.courseRepository)
+                let viewModel = ScheduleViewModel(courses: dependencies.courseRepository)
+                viewModel.onEffect = onEffect
+                self.viewModel = viewModel
             }
         }
     }

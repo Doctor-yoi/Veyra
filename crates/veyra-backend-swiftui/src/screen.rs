@@ -4,7 +4,7 @@
 //! 单个screen的Swift文件
 
 use veyra_codegen::{CodeWriter, USER_OWNED_NOTICE};
-use veyra_ir::ScreenDef;
+use veyra_ir::{ActionRef, LifecycleEvent, ScreenDef};
 
 use crate::swift::{self, ExprCx, ident};
 use crate::view::{self, ViewCx};
@@ -66,6 +66,12 @@ pub(crate) fn contract(s: &ScreenDef) -> String {
         "}",
         |w| {
             w.line(format!("var state: {}State {{ get }}", s.name));
+            if !s.effects.is_empty() {
+                w.line(format!(
+                    "var onEffect: (({}Effect) -> Void)? {{ get set }}",
+                    s.name
+                ));
+            }
             let setters: Vec<_> = s.writable_fields().collect();
             if !setters.is_empty() {
                 w.blank();
@@ -85,6 +91,37 @@ pub(crate) fn contract(s: &ScreenDef) -> String {
             }
         },
     );
+    if !s.effects.is_empty() {
+        w.blank();
+        w.line(format!(
+            "/// One-off events emitted by the {} view model",
+            s.name
+        ));
+        w.block(format!("enum {}Effect: Sendable {{", s.name), "}", |w| {
+            for e in &s.effects {
+                if e.params.is_empty() {
+                    w.line(format!("case {}", ident(&e.name)));
+                } else {
+                    w.line(format!("case {}({})", ident(&e.name), params(&e.params)));
+                }
+            }
+        });
+        w.blank();
+        w.block(
+            format!("extension {}ViewModelContract {{", s.name),
+            "}",
+            |w| {
+                w.line("/// Sends an effect to the root view");
+                w.block(
+                    format!("func emit(_ effect: {}Effect) {{", s.name),
+                    "}",
+                    |w| {
+                        w.line("onEffect?(effect)");
+                    },
+                );
+            },
+        );
+    }
     let setters: Vec<_> = s.writable_fields().collect();
     if !setters.is_empty() {
         w.blank();
@@ -147,9 +184,58 @@ fn construct(s: &ScreenDef, deps: &str) -> String {
     format!("{}ViewModel({})", s.name, args.join(", "))
 }
 
+/// 生命周期中调用action的表达式
+fn hook_call(a: &ActionRef) -> Option<(String, bool)> {
+    match a {
+        ActionRef::Dispatch {
+            action,
+            args,
+            is_async,
+        } => {
+            let cx = ExprCx {
+                state: "viewModel.state.",
+            };
+            let args: Vec<_> = args
+                .iter()
+                .map(|(n, v)| format!("{n}: {}", swift::expr(cx, v)))
+                .collect();
+            Some((
+                format!("viewModel.{}({})", ident(action), args.join(", ")),
+                *is_async,
+            ))
+        }
+        ActionRef::Param(_) => None,
+    }
+}
+
+/// View及其生命周期修饰符
+fn screen_view(w: &mut CodeWriter, s: &ScreenDef, set_effect: bool) {
+    w.line(format!("{}View(viewModel: viewModel)", s.name));
+    w.indent();
+    if set_effect {
+        w.line(".onAppear { viewModel.onEffect = onEffect }");
+    }
+    if let Some((call, is_async)) = s.hook(LifecycleEvent::Appear).and_then(hook_call) {
+        if is_async {
+            w.line(format!(".task {{ await {call} }}"));
+        } else {
+            w.line(format!(".onAppear {{ {call} }}"));
+        }
+    }
+    if let Some((call, is_async)) = s.hook(LifecycleEvent::Disappear).and_then(hook_call) {
+        if is_async {
+            w.line(format!(".onDisappear {{ Task {{ await {call} }} }}"));
+        } else {
+            w.line(format!(".onDisappear {{ {call} }}"));
+        }
+    }
+    w.dedent();
+}
+
 pub(crate) fn root(s: &ScreenDef, _options: &Options) -> String {
     let mut w = CodeWriter::new("    ");
     header(&mut w, &["SwiftUI"]);
+    let has_effects = !s.effects.is_empty();
     w.line(format!(
         "/// Entry point of {}, creates the view model and injects dependencies",
         s.name
@@ -157,26 +243,42 @@ pub(crate) fn root(s: &ScreenDef, _options: &Options) -> String {
     w.block(format!("struct {}Root: View {{", s.name), "}", |w| {
         if s.injects.is_empty() {
             w.line(format!("@State private var viewModel = {}", construct(s, "")));
-            w.blank();
-            w.block("var body: some View {", "}", |w| {
-                w.line(format!("{}View(viewModel: viewModel)", s.name));
-            });
-            return;
+        } else {
+            w.line("@Environment(\\.veyraDependencies) private var dependencies");
+            w.line(format!("@State private var viewModel: {}ViewModel?", s.name));
         }
-        w.line("@Environment(\\.veyraDependencies) private var dependencies");
-        w.line(format!("@State private var viewModel: {}ViewModel?", s.name));
+        if has_effects {
+            w.line(format!("private let onEffect: ({}Effect) -> Void", s.name));
+            w.blank();
+            w.line("/// `onEffect` handles one-off events such as navigation");
+            w.block(format!("init(onEffect: @escaping ({}Effect) -> Void = {{ _ in }}) {{", s.name), "}", |w| {
+                w.line("self.onEffect = onEffect");
+            });
+        }
         w.blank();
         w.block("var body: some View {", "}", |w| {
-            w.block("if let viewModel {", "} else {", |w| {
-                w.line(format!("{}View(viewModel: viewModel)", s.name));
-            });
+            if s.injects.is_empty() {
+                screen_view(w, s, has_effects);
+                return;
+            }
+            w.line("if let viewModel {");
+            w.indent();
+            screen_view(w, s, false);
+            w.dedent();
+            w.line("} else {");
             w.indent();
             w.block("Color.clear.onAppear {", "}", |w| {
                 w.block("guard let dependencies else {", "}", |w| {
                     w.line("assertionFailure(\"VeyraDependencies is missing, call veyraDependencies(_:) on an ancestor view\")");
                     w.line("return");
                 });
-                w.line(format!("viewModel = {}", construct(s, "dependencies")));
+                if has_effects {
+                    w.line(format!("let viewModel = {}", construct(s, "dependencies")));
+                    w.line("viewModel.onEffect = onEffect");
+                    w.line("self.viewModel = viewModel");
+                } else {
+                    w.line(format!("viewModel = {}", construct(s, "dependencies")));
+                }
             });
             w.dedent();
             w.line("}");
@@ -197,6 +299,9 @@ pub(crate) fn view_model(s: &ScreenDef, _options: &Options) -> String {
         "}",
         |w| {
             w.line(format!("let state = {}State()", s.name));
+            if !s.effects.is_empty() {
+                w.line(format!("var onEffect: (({}Effect) -> Void)?", s.name));
+            }
             if !s.injects.is_empty() {
                 w.blank();
                 for i in &s.injects {

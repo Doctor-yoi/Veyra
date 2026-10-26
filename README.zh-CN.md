@@ -74,7 +74,9 @@ View不能调用任意函数、修改状态或访问注入的依赖，有副作�
 | --- | --- |
 | `enum`、`model` | 各层共享的值类型 |
 | `repository` | 数据访问契约，由各平台原生实现 |
-| `screen` | 页面，包含`inject`、`state`、`computed`、`actions`与`view` |
+| `screen` | 页面，包含`inject`、`state`、`computed`、`actions`、`effects`、`lifecycle`与`view` |
+
+`effects`声明导航等一次性事件，由ViewModel通过`emit`发出，组装层通过`onEffect`接收，View本身不处理。`lifecycle`在页面出现或消失时分发action。
 
 条件编译用于选择平台专属内容。平台条件与`[flags]`中声明的自定义flag在编译期确定，每个平台单独做类型检查：
 
