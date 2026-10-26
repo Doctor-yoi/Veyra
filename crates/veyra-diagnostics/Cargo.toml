@@ -1,0 +1,16 @@
+[package]
+name = "veyra-diagnostics"
+description = "Veyra编译器的源码位置与诊断信息"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license-file.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[dependencies]
+unicode-width.workspace = true
+
+[lints]
+workspace = true
