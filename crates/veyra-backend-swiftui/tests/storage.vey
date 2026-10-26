@@ -31,8 +31,26 @@ store TodoStore for Todo {
   }
 }
 
+settings TodoPreferences {
+  showDone: Bool = true
+  sortKey: String = "dueAt"
+  limit: Int = 50
+  ratio: Double = 0.5
+  defaultPriority: Priority = .normal
+  lastSync: Date?
+  nickname: String? = nil
+}
+
+secure Account {
+  token: String
+  userId: Int
+  remember: Bool
+}
+
 screen Todos {
   inject todos: TodoStore
+  inject preferences: TodoPreferences
+  inject account: Account
 
   state {
     items: List<Todo> = []

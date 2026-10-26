@@ -10,7 +10,7 @@ use veyra_ir::{
 };
 
 use crate::kotlin::{self, Imports, ident};
-use crate::{Di, Options, assemble, dependency_name, generated};
+use crate::{Options, assemble, dependency_name, generated};
 
 pub(crate) fn entity(e: &EntityDef, o: &Options) -> String {
     let mut im = Imports::new(o.r_package());
@@ -325,21 +325,36 @@ pub(crate) fn database(program: &Program, o: &Options) -> String {
             ));
         }
     });
-    if o.di == Di::Hilt {
-        for i in [
-            "dagger.Module",
-            "dagger.Provides",
-            "dagger.hilt.InstallIn",
-            "dagger.hilt.android.qualifiers.ApplicationContext",
-            "dagger.hilt.components.SingletonComponent",
-            "javax.inject.Singleton",
-        ] {
-            im.add(i);
-        }
-        w.blank();
-        w.line("@Module");
-        w.line("@InstallIn(SingletonComponent::class)");
-        w.block("object VeyraStorageModule {", "}", |w| {
+    generated(&o.package, &im, &w.finish())
+}
+
+/// Hilt模式下为store、settings与secure提供默认实现
+pub(crate) fn hilt_module(program: &Program, o: &Options) -> String {
+    let mut im = Imports::new(o.r_package());
+    for i in [
+        "android.content.Context",
+        "dagger.Module",
+        "dagger.Provides",
+        "dagger.hilt.InstallIn",
+        "dagger.hilt.android.qualifiers.ApplicationContext",
+        "dagger.hilt.components.SingletonComponent",
+        "javax.inject.Singleton",
+    ] {
+        im.add(i);
+    }
+    let mut w = CodeWriter::new("    ");
+    w.line("@Module");
+    w.line("@InstallIn(SingletonComponent::class)");
+    w.block("object VeyraLocalModule {", "}", |w| {
+        let mut first = true;
+        let mut sep = |w: &mut CodeWriter| {
+            if !first {
+                w.blank();
+            }
+            first = false;
+        };
+        if !program.entities.is_empty() {
+            sep(w);
             w.line("@Provides");
             w.line("@Singleton");
             w.line("fun provideDatabase(@ApplicationContext context: Context): VeyraDatabase = VeyraDatabase.build(context)");
@@ -352,8 +367,20 @@ pub(crate) fn database(program: &Program, o: &Options) -> String {
                     camel_case(&format!("{}Dao", s.name))
                 ));
             }
-        });
-    }
+        }
+        for s in &program.settings {
+            sep(w);
+            w.line("@Provides");
+            w.line("@Singleton");
+            w.line(format!("fun provide{0}(@ApplicationContext context: Context): {0} = DataStore{0}(context)", s.name));
+        }
+        for s in &program.secures {
+            sep(w);
+            w.line("@Provides");
+            w.line("@Singleton");
+            w.line(format!("fun provide{0}(@ApplicationContext context: Context): {0} = Keystore{0}(context)", s.name));
+        }
+    });
     generated(&o.package, &im, &w.finish())
 }
 

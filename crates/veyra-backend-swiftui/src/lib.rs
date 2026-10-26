@@ -14,6 +14,7 @@
 //! 本地化文案生成类型安全的`L10n`访问器与String Catalog
 
 mod l10n;
+mod preferences;
 mod screen;
 mod storage;
 mod swift;
@@ -143,6 +144,25 @@ impl Backend for SwiftUiBackend {
             files.push(OutputFile::generated(
                 dir.join("VeyraStorage.generated.swift"),
                 storage::support(program),
+            ));
+        }
+        if !program.settings.is_empty() || !program.secures.is_empty() {
+            let dir = out.join("Preferences");
+            for st in &program.settings {
+                files.push(OutputFile::generated(
+                    dir.join(format!("{}.generated.swift", st.name)),
+                    preferences::settings(st),
+                ));
+            }
+            for st in &program.secures {
+                files.push(OutputFile::generated(
+                    dir.join(format!("{}.generated.swift", st.name)),
+                    preferences::secure(st),
+                ));
+            }
+            files.push(OutputFile::generated(
+                dir.join("VeyraPreferences.generated.swift"),
+                preferences::support(program),
             ));
         }
         if !program.components.is_empty() {
@@ -343,9 +363,18 @@ fn factory_container(program: &Program, options: &Options) -> String {
                 format!("var {}: Factory<any {t}> {{", dependency_name(t)),
                 "}",
                 |w| {
-                    w.line(format!(
-                        "self {{ @MainActor in fatalError(\"{t} is not registered\") }}"
-                    ));
+                    // settings与secure有默认实现，其余依赖需要应用注册
+                    if program.settings.iter().any(|x| x.name == *t) {
+                        w.line(format!(
+                            "self {{ @MainActor in UserDefaults{t}() }}.singleton"
+                        ));
+                    } else if program.secures.iter().any(|x| x.name == *t) {
+                        w.line(format!("self {{ @MainActor in Keychain{t}() }}.singleton"));
+                    } else {
+                        w.line(format!(
+                            "self {{ @MainActor in fatalError(\"{t} is not registered\") }}"
+                        ));
+                    }
                 },
             );
         }

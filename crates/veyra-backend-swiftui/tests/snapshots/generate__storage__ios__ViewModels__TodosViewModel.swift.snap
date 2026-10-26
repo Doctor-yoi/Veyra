@@ -11,9 +11,13 @@ final class TodosViewModel: TodosViewModelContract {
     let state = TodosState()
 
     private let todos: any TodoStore
+    private let preferences: any TodoPreferences
+    private let account: any Account
 
-    init(todos: any TodoStore) {
+    init(todos: any TodoStore, preferences: any TodoPreferences, account: any Account) {
         self.todos = todos
+        self.preferences = preferences
+        self.account = account
     }
 
     func load() async {

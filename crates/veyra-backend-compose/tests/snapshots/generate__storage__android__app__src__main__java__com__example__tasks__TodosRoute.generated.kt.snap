@@ -17,7 +17,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 @Composable
 fun TodosRoute(modifier: Modifier = Modifier) {
     val dependencies = LocalVeyraDependencies.current
-    val viewModel: TodosViewModel = viewModel { TodosViewModel(todos = dependencies.todoStore) }
+    val viewModel: TodosViewModel = viewModel { TodosViewModel(todos = dependencies.todoStore, preferences = dependencies.todoPreferences, account = dependencies.account) }
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
         viewModel.load()

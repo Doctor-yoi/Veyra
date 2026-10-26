@@ -10,6 +10,8 @@ import androidx.compose.runtime.staticCompositionLocalOf
 
 /** Dependencies provided by the app and passed to view models by the routes */
 interface VeyraDependencies {
+    val account: Account
+    val todoPreferences: TodoPreferences
     val todoStore: TodoStore
 }
 
