@@ -1,0 +1,33 @@
+# Rust构建产物
+/target/
+**/*.rs.bk
+*.pdb
+
+# insta快照临时文件
+*.snap.new
+*.pending-snap
+
+# 示例工程的生成输出
+/examples/*/ios/Generated/
+/examples/*/android/app/src/main/res/values*/veyra_strings.xml
+/examples/*/.veyra/
+**/*.generated.swift
+**/*.generated.kt
+**/Veyra.xcstrings
+
+# 编辑器扩展打包产物
+/editors/vscode/node_modules/
+/editors/vscode/out/
+*.vsix
+
+# 编辑器与系统文件
+.idea/
+/.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# 本地工具配置与讨论记录
+.claude/
+codex_chat_history.txt

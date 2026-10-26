@@ -1,0 +1,54 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/veyra-diagnostics",
+    "crates/veyra-syntax",
+    "crates/veyra-ir",
+    "crates/veyra-sema",
+    "crates/veyra-codegen",
+    "crates/veyra-backend-swiftui",
+    "crates/veyra-backend-compose",
+    "crates/veyra-l10n",
+    "crates/veyra-project",
+    "crates/veyra-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+authors = ["Doctor-yoi"]
+license-file = "LICENSE"
+repository = "https://github.com/Doctor-yoi/Veyra"
+homepage = "https://github.com/Doctor-yoi/Veyra"
+
+[workspace.dependencies]
+veyra-diagnostics = { path = "crates/veyra-diagnostics" }
+veyra-syntax = { path = "crates/veyra-syntax" }
+veyra-ir = { path = "crates/veyra-ir" }
+veyra-sema = { path = "crates/veyra-sema" }
+veyra-codegen = { path = "crates/veyra-codegen" }
+veyra-backend-swiftui = { path = "crates/veyra-backend-swiftui" }
+veyra-backend-compose = { path = "crates/veyra-backend-compose" }
+veyra-l10n = { path = "crates/veyra-l10n" }
+veyra-project = { path = "crates/veyra-project" }
+
+clap = { version = "4", features = ["derive"] }
+indexmap = { version = "2", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+toml = "0.8"
+toml_edit = "0.22"
+unicode-width = "0.2"
+insta = "1"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
