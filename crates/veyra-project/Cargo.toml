@@ -1,5 +1,6 @@
 [package]
 name = "veyra-project"
+description = "Veyra项目配置、源文件发现与输出写入"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,6 +10,13 @@ repository.workspace = true
 homepage.workspace = true
 
 [dependencies]
+indexmap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+veyra-codegen.workspace = true
+veyra-diagnostics.workspace = true
+veyra-l10n.workspace = true
 
 [lints]
 workspace = true
