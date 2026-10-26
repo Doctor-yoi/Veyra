@@ -8,7 +8,7 @@ use veyra_ir::{ActionRef, LifecycleEvent, ScreenDef, ViewNode};
 
 use crate::kotlin::{self, ExprCx, Imports, ident};
 use crate::view::{Parent, ViewEmitter};
-use crate::{Options, assemble, dependency_name, generated, params};
+use crate::{Di, Options, assemble, dependency_name, generated, params};
 
 pub(crate) fn ui_state(s: &ScreenDef, o: &Options) -> String {
     let mut im = Imports::new(o.r_package());
@@ -261,9 +261,14 @@ pub(crate) fn route(s: &ScreenDef, o: &Options) -> String {
         "androidx.compose.runtime.getValue",
         "androidx.compose.ui.Modifier",
         "androidx.lifecycle.compose.collectAsStateWithLifecycle",
-        "androidx.lifecycle.viewmodel.compose.viewModel",
     ] {
         im.add(i);
+    }
+    let hilt = o.di == Di::Hilt;
+    if hilt {
+        im.add("androidx.hilt.navigation.compose.hiltViewModel");
+    } else {
+        im.add("androidx.lifecycle.viewmodel.compose.viewModel");
     }
     let has_effects = !s.effects.is_empty();
     let mut w = CodeWriter::new("    ");
@@ -281,14 +286,21 @@ pub(crate) fn route(s: &ScreenDef, o: &Options) -> String {
         "modifier: Modifier = Modifier".to_string()
     };
     w.block(format!("fun {}Route({params}) {{", s.name), "}", |w| {
-        if !s.injects.is_empty() {
-            w.line("val dependencies = LocalVeyraDependencies.current");
+        if hilt {
+            w.line(format!(
+                "val viewModel: {}ViewModel = hiltViewModel()",
+                s.name
+            ));
+        } else {
+            if !s.injects.is_empty() {
+                w.line("val dependencies = LocalVeyraDependencies.current");
+            }
+            w.line(format!(
+                "val viewModel: {0}ViewModel = viewModel {{ {1} }}",
+                s.name,
+                construct(s)
+            ));
         }
-        w.line(format!(
-            "val viewModel: {0}ViewModel = viewModel {{ {1} }}",
-            s.name,
-            construct(s)
-        ));
         w.line("val state by viewModel.state.collectAsStateWithLifecycle()");
         if has_effects {
             im.add("androidx.compose.runtime.LaunchedEffect");
@@ -330,13 +342,24 @@ pub(crate) fn view_model(s: &ScreenDef, o: &Options) -> String {
         im.add("kotlinx.coroutines.launch");
     }
     let mut w = CodeWriter::new("    ");
+    if o.di == Di::Hilt {
+        im.add("dagger.hilt.android.lifecycle.HiltViewModel");
+        im.add("javax.inject.Inject");
+        w.line("@HiltViewModel");
+    }
+    let ctor = if o.di == Di::Hilt {
+        " @Inject constructor"
+    } else {
+        ""
+    };
     if s.injects.is_empty() {
+        let parens = if ctor.is_empty() { "" } else { "()" };
         w.line(format!(
-            "class {0}ViewModel : {0}ViewModelBase() {{",
+            "class {0}ViewModel{ctor}{parens} : {0}ViewModelBase() {{",
             s.name
         ));
     } else {
-        w.line(format!("class {}ViewModel(", s.name));
+        w.line(format!("class {}ViewModel{ctor}(", s.name));
         w.indent();
         for i in &s.injects {
             w.line(format!("private val {}: {},", ident(&i.name), i.ty));

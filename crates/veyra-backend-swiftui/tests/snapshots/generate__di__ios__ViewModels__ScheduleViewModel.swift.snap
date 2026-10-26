@@ -1,0 +1,28 @@
+---
+source: crates/veyra-backend-swiftui/tests/generate.rs
+expression: f.contents
+---
+// This file is created by Veyra and will not be overwritten
+
+import Foundation
+import FactoryKit
+
+@MainActor
+final class ScheduleViewModel: ScheduleViewModelContract {
+    let state = ScheduleState()
+    var onEffect: ((ScheduleEffect) -> Void)?
+
+    @Injected(\.courseRepository) private var courses
+
+    func refresh() async {
+        // Implement business logic here
+    }
+
+    func openCourse(id: String) {
+        // Implement business logic here
+    }
+
+    func stop() {
+        // Implement business logic here
+    }
+}

@@ -1,0 +1,31 @@
+---
+source: crates/veyra-backend-compose/tests/generate.rs
+expression: f.contents
+---
+// This file is created by Veyra and will not be overwritten
+
+package com.example.schedule.ui
+
+import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
+import kotlinx.coroutines.launch
+
+@HiltViewModel
+class ScheduleViewModel @Inject constructor(
+    private val courses: CourseRepository,
+) : ScheduleViewModelBase() {
+    override fun refresh() {
+        viewModelScope.launch {
+            // Implement business logic here
+        }
+    }
+
+    override fun openCourse(id: String) {
+        // Implement business logic here
+    }
+
+    override fun stop() {
+        // Implement business logic here
+    }
+}

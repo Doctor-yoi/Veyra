@@ -111,6 +111,8 @@ Text(format(startsAt, .dateTime(.short)))
 
 以`.generated.swift`或`.generated.kt`结尾的文件每次构建都会重新生成。ViewModel骨架只在首次构建时创建，之后不会被覆盖，业务逻辑始终写在开发者自己的文件中。绑定的写入一律经过生成的setter，ViewModel可以重写setter来校验输入。
 
+通过`inject`声明的依赖只会进入ViewModel。默认由组装层从`VeyraDependencies`读取，应用通过Environment或`CompositionLocal`提供。在`[swiftui]`中设置`di = "factory"`可改用FactoryKit的`@Injected`，在`[compose]`中设置`di = "hilt"`可生成`@HiltViewModel`。
+
 ## 命令
 
 | 命令 | 说明 |

@@ -111,6 +111,8 @@ Text(format(startsAt, .dateTime(.short)))
 
 Files ending in `.generated.swift` or `.generated.kt` are rewritten on every build. View model skeletons are created once and never overwritten, so business logic stays in files you own. Writes from bindings always go through generated setters, which view models may override to validate input.
 
+Dependencies declared with `inject` only ever reach view models. By default the root view or route reads them from `VeyraDependencies`, which the app provides through the environment or a `CompositionLocal`. Set `di = "factory"` under `[swiftui]` to resolve them with FactoryKit's `@Injected`, or `di = "hilt"` under `[compose]` to generate `@HiltViewModel` view models.
+
 ## Commands
 
 | Command | Description |

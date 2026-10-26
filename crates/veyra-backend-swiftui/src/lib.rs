@@ -34,6 +34,8 @@ pub enum Di {
     /// 构造器注入，依赖从Environment读取
     #[default]
     Manual,
+    /// 通过FactoryKit的`@Injected`注入
+    Factory,
 }
 
 /// `[swiftui]`配置段
@@ -47,6 +49,8 @@ pub struct Options {
     pub di: Di,
     /// String Catalog的表名
     pub table: String,
+    /// FactoryKit的模块名，旧版本为`Factory`
+    pub factory_module: String,
 }
 
 impl Default for Options {
@@ -56,6 +60,7 @@ impl Default for Options {
             user_dir: "ios/ViewModels".into(),
             di: Di::Manual,
             table: "Veyra".into(),
+            factory_module: "FactoryKit".into(),
         }
     }
 }
@@ -98,7 +103,13 @@ impl Backend for SwiftUiBackend {
                 repositories(program),
             ));
         }
-        if program.screens.iter().any(|s| !s.injects.is_empty()) {
+        let has_injects = program.screens.iter().any(|s| !s.injects.is_empty());
+        if has_injects && options.di == Di::Factory {
+            files.push(OutputFile::generated(
+                out.join("Container+Veyra.generated.swift"),
+                factory_container(program, &options),
+            ));
+        } else if has_injects {
             files.push(OutputFile::generated(
                 out.join("VeyraDependencies.generated.swift"),
                 dependencies(program),
@@ -294,4 +305,41 @@ fn components(program: &Program) -> String {
         w.blank();
     }
     w.finish()
+}
+
+/// FactoryKit的注册入口，默认实现需由应用注册
+fn factory_container(program: &Program, options: &Options) -> String {
+    let mut w = CodeWriter::new("    ");
+    header(&mut w, &[options.factory_module.as_str()]);
+    w.line(
+        "/// Register implementations at launch, for example in `AutoRegistering.autoRegister()`",
+    );
+    w.block("extension Container {", "}", |w| {
+        for (i, t) in injected_types(program).iter().enumerate() {
+            if i > 0 {
+                w.blank();
+            }
+            w.block(
+                format!("var {}: Factory<any {t}> {{", dependency_name(t)),
+                "}",
+                |w| {
+                    w.line(format!(
+                        "self {{ @MainActor in fatalError(\"{t} is not registered\") }}"
+                    ));
+                },
+            );
+        }
+    });
+    w.finish()
+}
+
+fn injected_types(program: &Program) -> Vec<&str> {
+    let mut types: Vec<&str> = program
+        .screens
+        .iter()
+        .flat_map(|s| s.injects.iter().map(|i| i.ty.as_str()))
+        .collect();
+    types.sort();
+    types.dedup();
+    types
 }

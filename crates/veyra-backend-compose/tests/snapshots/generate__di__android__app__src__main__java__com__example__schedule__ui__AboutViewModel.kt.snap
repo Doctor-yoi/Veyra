@@ -1,0 +1,14 @@
+---
+source: crates/veyra-backend-compose/tests/generate.rs
+expression: f.contents
+---
+// This file is created by Veyra and will not be overwritten
+
+package com.example.schedule.ui
+
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
+
+@HiltViewModel
+class AboutViewModel @Inject constructor() : AboutViewModelBase() {
+}

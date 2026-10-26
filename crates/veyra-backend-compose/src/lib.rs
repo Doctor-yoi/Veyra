@@ -35,6 +35,8 @@ pub enum Di {
     /// 通过CompositionLocal提供依赖，构造器注入ViewModel
     #[default]
     Manual,
+    /// 使用Hilt注入ViewModel
+    Hilt,
 }
 
 /// `[compose]`配置段
@@ -132,7 +134,7 @@ impl Backend for ComposeBackend {
                 repositories(program, &options),
             ));
         }
-        if program.screens.iter().any(|s| !s.injects.is_empty()) {
+        if options.di == Di::Manual && program.screens.iter().any(|s| !s.injects.is_empty()) {
             files.push(OutputFile::generated(
                 file("VeyraDependencies"),
                 dependencies(program, &options),
