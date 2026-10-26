@@ -1,5 +1,6 @@
 [package]
 name = "veyra-l10n"
+description = "Veyra翻译文件的同步、校验与本地化目录构建"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,6 +10,11 @@ repository.workspace = true
 homepage.workspace = true
 
 [dependencies]
+indexmap.workspace = true
+serde.workspace = true
+toml_edit.workspace = true
+veyra-diagnostics.workspace = true
+veyra-ir.workspace = true
 
 [lints]
 workspace = true

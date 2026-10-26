@@ -365,6 +365,13 @@ dependencies = [
 [[package]]
 name = "veyra-l10n"
 version = "0.1.0"
+dependencies = [
+ "indexmap",
+ "serde",
+ "toml_edit",
+ "veyra-diagnostics",
+ "veyra-ir",
+]
 
 [[package]]
 name = "veyra-project"
