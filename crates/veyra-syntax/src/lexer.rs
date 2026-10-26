@@ -10,7 +10,7 @@ pub struct Lexed {
     pub comments: Vec<Comment>,
 }
 
-/// 将源码切分为token，注释单独收集。
+/// 将源码切分为token，注释单独收集
 pub fn lex(file: FileId, src: &str, diags: &mut Diagnostics) -> Lexed {
     let mut lexer = Lexer {
         file,
@@ -255,7 +255,7 @@ impl Lexer<'_> {
     }
 }
 
-/// 解析普通字符串字面量的转义，输入包含两侧引号。
+/// 解析普通字符串字面量的转义，输入包含两侧引号
 pub fn unescape(raw: &str) -> Result<String, String> {
     let inner = raw
         .strip_prefix('"')
@@ -283,7 +283,7 @@ pub fn unescape(raw: &str) -> Result<String, String> {
     Ok(out)
 }
 
-/// 解析多行原样字符串：去掉首尾空行并按最小缩进对齐。
+/// 解析多行原样字符串：去掉首尾空行并按最小缩进对齐
 pub fn dedent_raw(raw: &str) -> String {
     let inner = &raw[3..raw.len().saturating_sub(3).max(3)];
     let inner = inner

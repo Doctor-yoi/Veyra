@@ -7,7 +7,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::{Diagnostic, Diagnostics, Severity, SourceMap};
 
-/// 渲染选项。
+/// 渲染选项
 #[derive(Clone, Copy, Debug, Default)]
 pub struct RenderOptions {
     pub color: bool,
@@ -25,11 +25,15 @@ struct Palette {
 
 impl Palette {
     fn paint(&self, style: &str, text: &str) -> String {
-        if self.on { format!("{style}{text}{RESET}") } else { text.to_string() }
+        if self.on {
+            format!("{style}{text}{RESET}")
+        } else {
+            text.to_string()
+        }
     }
 }
 
-/// 渲染单条诊断。
+/// 渲染单条诊断
 pub fn render(diagnostic: &Diagnostic, sources: &SourceMap, options: RenderOptions) -> String {
     let p = Palette { on: options.color };
     let mut out = String::new();
@@ -84,7 +88,10 @@ pub fn render(diagnostic: &Diagnostic, sources: &SourceMap, options: RenderOptio
         let prefix_width = text.get(..col).map(UnicodeWidthStr::width).unwrap_or(col);
         let line_end = line_start + text.len();
         let mark_end = end.min(line_end).max(start + 1);
-        let marked = file.text.get(start..mark_end.min(file.text.len())).unwrap_or(" ");
+        let marked = file
+            .text
+            .get(start..mark_end.min(file.text.len()))
+            .unwrap_or(" ");
         let mark_width = UnicodeWidthStr::width(marked).max(1);
         let mark = if label.primary { "^" } else { "-" }.repeat(mark_width);
         let style = if label.primary { style } else { BLUE };
@@ -110,8 +117,12 @@ pub fn render(diagnostic: &Diagnostic, sources: &SourceMap, options: RenderOptio
     out
 }
 
-/// 渲染全部诊断，并附加汇总行。
-pub fn render_all(diagnostics: &Diagnostics, sources: &SourceMap, options: RenderOptions) -> String {
+/// 渲染全部诊断，并附加汇总行
+pub fn render_all(
+    diagnostics: &Diagnostics,
+    sources: &SourceMap,
+    options: RenderOptions,
+) -> String {
     let mut out = String::new();
     for diagnostic in diagnostics {
         out.push_str(&render(diagnostic, sources, options));
@@ -121,9 +132,17 @@ pub fn render_all(diagnostics: &Diagnostics, sources: &SourceMap, options: Rende
     let warnings = diagnostics.warning_count();
     let p = Palette { on: options.color };
     if errors > 0 {
-        let _ = writeln!(out, "{}", p.paint(RED, &format!("error: 共{errors}个错误，{warnings}个警告")));
+        let _ = writeln!(
+            out,
+            "{}",
+            p.paint(RED, &format!("error: 共{errors}个错误，{warnings}个警告"))
+        );
     } else if warnings > 0 {
-        let _ = writeln!(out, "{}", p.paint(YELLOW, &format!("warning: 共{warnings}个警告")));
+        let _ = writeln!(
+            out,
+            "{}",
+            p.paint(YELLOW, &format!("warning: 共{warnings}个警告"))
+        );
     }
     out
 }

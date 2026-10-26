@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only AND LicenseRef-Commons-Clause-1.0
 // Copyright (C) 2026 Doctor-yoi
 
-//! Veyra语法树。所有节点都带有源码区间，供诊断与格式化使用。
+//! Veyra语法树。所有节点都带有源码区间，供诊断与格式化使用
 
 use veyra_diagnostics::{FileId, Span};
 
@@ -11,21 +11,21 @@ pub struct Ident {
     pub span: Span,
 }
 
-/// 单个源文件。
+/// 单个源文件
 #[derive(Clone, Debug, PartialEq)]
 pub struct File {
     pub id: FileId,
     pub items: Vec<Node<Item>>,
 }
 
-/// 可被`#if`包裹的节点。
+/// 可被`#if`包裹的节点
 #[derive(Clone, Debug, PartialEq)]
 pub enum Node<T> {
     Item(T),
     Cfg(CfgGroup<T>),
 }
 
-/// `#if ... #elseif ... #else ... #endif`整体。
+/// `#if ... #elseif ... #else ... #endif`整体
 #[derive(Clone, Debug, PartialEq)]
 pub struct CfgGroup<T> {
     pub branches: Vec<CfgBranch<T>>,
@@ -101,7 +101,7 @@ impl Item {
         }
     }
 
-    /// 声明关键字。
+    /// 声明关键字
     pub fn keyword(&self) -> &'static str {
         match self {
             Item::Enum(_) => "enum",
@@ -161,7 +161,7 @@ pub struct EntityDecl {
     pub span: Span,
 }
 
-/// settings与secure共用的结构。
+/// settings与secure共用的结构
 #[derive(Clone, Debug, PartialEq)]
 pub struct FieldsDecl {
     pub name: Ident,
@@ -246,7 +246,7 @@ pub enum ScreenMember {
     View(Block<ViewNode>),
 }
 
-/// 带关键字的花括号块。
+/// 带关键字的花括号块
 #[derive(Clone, Debug, PartialEq)]
 pub struct Block<T> {
     pub keyword: Span,
@@ -419,7 +419,7 @@ impl BinaryOp {
         }
     }
 
-    /// 优先级，数值越大结合越紧。
+    /// 优先级，数值越大结合越紧
     pub fn precedence(self) -> u8 {
         match self {
             BinaryOp::Or => 1,

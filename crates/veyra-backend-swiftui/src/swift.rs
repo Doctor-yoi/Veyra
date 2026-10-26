@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only AND LicenseRef-Commons-Clause-1.0
 // Copyright (C) 2026 Doctor-yoi
 
-//! Swift类型、字面量与表达式的映射。
+//! Swift类型、字面量与表达式的映射
 
 use veyra_codegen::{camel_case, escape_ident};
 use veyra_ir::{BinaryOp, Expr, ExprKind, Type, UnaryOp};
@@ -106,12 +106,12 @@ pub(crate) fn double_literal(v: f64) -> String {
     }
 }
 
-/// 本地化key对应的访问器名称。
+/// 本地化key对应的访问器名称
 pub(crate) fn l10n_name(key: &str) -> String {
     ident(&camel_case(key))
 }
 
-/// state与computed的访问前缀，例如`viewModel.state.`。
+/// state与computed的访问前缀，例如`viewModel.state.`
 #[derive(Clone, Copy)]
 pub(crate) struct ExprCx<'a> {
     pub state: &'a str,
@@ -224,7 +224,7 @@ fn emit(cx: ExprCx, e: &Expr) -> (String, u8) {
     }
 }
 
-/// 可直接作为`StringProtocol`参数的字符串；字面量包一层`String(...)`避免被当作本地化key。
+/// 可直接作为`StringProtocol`参数的字符串；字面量包一层`String(...)`避免被当作本地化key
 pub(crate) fn plain_string_arg(cx: ExprCx, e: &Expr) -> String {
     match &e.kind {
         ExprKind::String(s) => format!("String({})", string_literal(s)),

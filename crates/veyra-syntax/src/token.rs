@@ -51,7 +51,7 @@ pub enum TokenKind {
 }
 
 impl TokenKind {
-    /// 用于诊断信息的描述。
+    /// 用于诊断信息的描述
     pub fn describe(self) -> &'static str {
         use TokenKind::*;
         match self {
@@ -106,7 +106,7 @@ pub struct Token {
     pub newline_before: bool,
 }
 
-/// 源码中的注释，格式化时用于还原。
+/// 源码中的注释，格式化时用于还原
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Comment {
     pub span: Span,

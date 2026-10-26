@@ -2,7 +2,7 @@
 source: crates/veyra-backend-swiftui/tests/generate.rs
 expression: f.contents
 ---
-// 此文件由Veyra创建，之后不会再被覆盖。
+// This file is created by Veyra and will not be overwritten
 
 import Foundation
 
@@ -17,10 +17,10 @@ final class ScheduleViewModel: ScheduleViewModelContract {
     }
 
     func refresh() async {
-        // 在此实现业务逻辑
+        // Implement business logic here
     }
 
     func openCourse(id: String) {
-        // 在此实现业务逻辑
+        // Implement business logic here
     }
 }

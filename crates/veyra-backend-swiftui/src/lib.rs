@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only AND LicenseRef-Commons-Clause-1.0
 // Copyright (C) 2026 Doctor-yoi
 
-//! Veyra的SwiftUI后端。
+//! Veyra的SwiftUI后端
 //!
 //! 目标为iOS 17+，状态使用Observation框架。每个screen生成：
 //!
@@ -11,7 +11,7 @@
 //! - `XxxRoot`：组装层，负责创建ViewModel并注入依赖
 //! - `XxxViewModel`：开发者自有的实现骨架，仅首次生成
 //!
-//! 本地化文案生成类型安全的`L10n`访问器与String Catalog。
+//! 本地化文案生成类型安全的`L10n`访问器与String Catalog
 
 mod l10n;
 mod screen;
@@ -27,7 +27,7 @@ use veyra_ir::{Platform, Program};
 
 use crate::swift::ident;
 
-/// 依赖注入方式。
+/// 依赖注入方式
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum Di {
@@ -36,7 +36,7 @@ pub enum Di {
     Manual,
 }
 
-/// `[swiftui]`配置段。
+/// `[swiftui]`配置段
 #[derive(Clone, Debug, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Options {
@@ -211,7 +211,7 @@ fn repositories(program: &Program) -> String {
     w.finish()
 }
 
-/// 依赖类型在`VeyraDependencies`中的属性名。
+/// 依赖类型在`VeyraDependencies`中的属性名
 pub(crate) fn dependency_name(ty: &str) -> String {
     ident(&camel_case(ty))
 }
@@ -226,7 +226,7 @@ fn dependencies(program: &Program) -> String {
     types.dedup();
     let mut w = CodeWriter::new("    ");
     header(&mut w, &["SwiftUI"]);
-    w.line("/// 应用提供给各screen的依赖，由组装层传给ViewModel。");
+    w.line("/// Dependencies provided by the app and passed to view models by the root views");
     w.line("@MainActor");
     w.block("protocol VeyraDependencies: Sendable {", "}", |w| {
         for t in &types {
@@ -239,7 +239,7 @@ fn dependencies(program: &Program) -> String {
     });
     w.blank();
     w.block("extension View {", "}", |w| {
-        w.line("/// 向子视图注入依赖。");
+        w.line("/// Provides dependencies to descendant views");
         w.block(
             "func veyraDependencies(_ dependencies: any VeyraDependencies) -> some View {",
             "}",
@@ -251,7 +251,7 @@ fn dependencies(program: &Program) -> String {
     w.finish()
 }
 
-/// 字段默认值。
+/// 字段默认值
 pub(crate) fn default_value(e: &veyra_ir::Expr) -> String {
     swift::expr(swift::ExprCx { state: "" }, e)
 }

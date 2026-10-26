@@ -3,7 +3,7 @@
 
 use std::fmt;
 
-/// 值类型。
+/// 值类型
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Type {
     Bool,
@@ -45,7 +45,7 @@ impl Type {
         matches!(self, Type::Unknown)
     }
 
-    /// 去掉一层可选。
+    /// 去掉一层可选
     pub fn unwrap_optional(&self) -> &Type {
         match self {
             Type::Optional(inner) => inner,
@@ -53,7 +53,7 @@ impl Type {
         }
     }
 
-    /// 列表元素类型。
+    /// 列表元素类型
     pub fn element(&self) -> Option<&Type> {
         match self {
             Type::List(inner) => Some(inner),
@@ -61,7 +61,7 @@ impl Type {
         }
     }
 
-    /// 是否包含Stream。
+    /// 是否包含Stream
     pub fn contains_stream(&self) -> bool {
         match self {
             Type::Stream(_) => true,
@@ -70,7 +70,7 @@ impl Type {
         }
     }
 
-    /// 类型兼容判断，Unknown与任何类型兼容。
+    /// 类型兼容判断，Unknown与任何类型兼容
     pub fn accepts(&self, other: &Type) -> bool {
         if self.is_unknown() || other.is_unknown() {
             return true;

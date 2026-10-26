@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 
 use crate::Type;
 
-/// 带类型的纯表达式。
+/// 带类型的纯表达式
 #[derive(Clone, Debug, PartialEq)]
 pub struct Expr {
     pub kind: ExprKind,
@@ -102,7 +102,7 @@ pub enum ExprKind {
     },
 }
 
-/// 命令分发。
+/// 命令分发
 #[derive(Clone, Debug, PartialEq)]
 pub enum ActionRef {
     /// 调用screen的action
@@ -115,7 +115,7 @@ pub enum ActionRef {
     Param(String),
 }
 
-/// 双向绑定。
+/// 双向绑定
 #[derive(Clone, Debug, PartialEq)]
 pub enum BindingRef {
     /// 绑定到可写state，写入经过setter
@@ -128,7 +128,7 @@ pub enum BindingRef {
     Param { name: String, ty: Type },
 }
 
-/// 组件或修饰符的实参。
+/// 组件或修饰符的实参
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Expr(Expr),
@@ -177,7 +177,7 @@ impl Value {
     }
 }
 
-/// 内置组件。
+/// 内置组件
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Builtin {
     Column,
@@ -243,7 +243,7 @@ impl Builtin {
         Builtin::ALL.into_iter().find(|b| b.name() == name)
     }
 
-    /// 是否为布局容器。
+    /// 是否为布局容器
     pub fn is_container(self) -> bool {
         matches!(
             self,
@@ -259,7 +259,7 @@ pub enum ElementKind {
     Component(String),
 }
 
-/// 组件实例。
+/// 组件实例
 #[derive(Clone, Debug, PartialEq)]
 pub struct Element {
     pub kind: ElementKind,

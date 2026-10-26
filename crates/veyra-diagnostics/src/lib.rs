@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only AND LicenseRef-Commons-Clause-1.0
 // Copyright (C) 2026 Doctor-yoi
 
-//! Veyra编译器的源码位置与诊断信息。
+//! Veyra编译器的源码位置与诊断信息
 //!
 //! 所有阶段（解析、语义检查、代码生成）都通过[`Diagnostic`]报告问题，
-//! 由[`render`]统一渲染为rustc风格的文本输出。
+//! 由[`render`]统一渲染为rustc风格的文本输出
 //!
 //! 错误码分段：
 //!
@@ -23,7 +23,7 @@ mod source;
 pub use render::{RenderOptions, render, render_all};
 pub use source::{FileId, SourceFile, SourceMap, Span};
 
-/// 诊断级别。
+/// 诊断级别
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Severity {
     Error,
@@ -31,7 +31,7 @@ pub enum Severity {
     Note,
 }
 
-/// 指向源码区间的标注。
+/// 指向源码区间的标注
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Label {
     pub span: Span,
@@ -39,7 +39,7 @@ pub struct Label {
     pub primary: bool,
 }
 
-/// 一条诊断信息。
+/// 一条诊断信息
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Diagnostic {
     pub severity: Severity,
@@ -59,18 +59,32 @@ impl Diagnostic {
     }
 
     fn new(severity: Severity, code: &'static str, message: impl Into<String>) -> Self {
-        Self { severity, code, message: message.into(), labels: Vec::new(), notes: Vec::new() }
+        Self {
+            severity,
+            code,
+            message: message.into(),
+            labels: Vec::new(),
+            notes: Vec::new(),
+        }
     }
 
-    /// 添加主标注。
+    /// 添加主标注
     pub fn with_label(mut self, span: Span, message: impl Into<String>) -> Self {
-        self.labels.push(Label { span, message: message.into(), primary: true });
+        self.labels.push(Label {
+            span,
+            message: message.into(),
+            primary: true,
+        });
         self
     }
 
-    /// 添加次要标注。
+    /// 添加次要标注
     pub fn with_secondary(mut self, span: Span, message: impl Into<String>) -> Self {
-        self.labels.push(Label { span, message: message.into(), primary: false });
+        self.labels.push(Label {
+            span,
+            message: message.into(),
+            primary: false,
+        });
         self
     }
 
@@ -84,7 +98,7 @@ impl Diagnostic {
     }
 }
 
-/// 诊断收集器。
+/// 诊断收集器
 #[derive(Clone, Debug, Default)]
 pub struct Diagnostics {
     items: Vec<Diagnostic>,
@@ -112,7 +126,10 @@ impl Diagnostics {
     }
 
     pub fn warning_count(&self) -> usize {
-        self.items.iter().filter(|d| d.severity == Severity::Warning).count()
+        self.items
+            .iter()
+            .filter(|d| d.severity == Severity::Warning)
+            .count()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -123,7 +140,7 @@ impl Diagnostics {
         self.items.iter()
     }
 
-    /// 按位置排序并去除完全重复的条目。
+    /// 按位置排序并去除完全重复的条目
     pub fn sorted(mut self) -> Self {
         self.items.sort_by_key(|d| {
             let span = d.labels.iter().find(|l| l.primary).map(|l| l.span);
@@ -140,7 +157,9 @@ impl Diagnostics {
 
 impl From<Diagnostic> for Diagnostics {
     fn from(diagnostic: Diagnostic) -> Self {
-        Self { items: vec![diagnostic] }
+        Self {
+            items: vec![diagnostic],
+        }
     }
 }
 

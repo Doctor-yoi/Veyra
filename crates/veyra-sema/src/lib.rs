@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only AND LicenseRef-Commons-Clause-1.0
 // Copyright (C) 2026 Doctor-yoi
 
-//! Veyra语义检查。
+//! Veyra语义检查
 //!
 //! 对每个目标平台单独执行一次：
 //!
@@ -11,7 +11,7 @@
 //! 4. 收集本地化文案
 //! 5. 降级为[`veyra_ir::Program`]
 //!
-//! 即使存在错误也会返回尽可能完整的IR，调用方应先检查诊断再使用IR。
+//! 即使存在错误也会返回尽可能完整的IR，调用方应先检查诊断再使用IR
 
 mod catalog;
 mod cfg;
@@ -27,7 +27,7 @@ use veyra_syntax::ast;
 
 use crate::cfg::Cfg;
 
-/// 一次检查的目标。
+/// 一次检查的目标
 #[derive(Clone, Debug)]
 pub struct Target {
     pub platform: Platform,
@@ -44,14 +44,14 @@ impl Target {
     }
 }
 
-/// 检查结果。
+/// 检查结果
 #[derive(Debug)]
 pub struct Analysis {
     pub program: Program,
     pub diagnostics: Diagnostics,
 }
 
-/// 对一组源文件执行语义检查。
+/// 对一组源文件执行语义检查
 pub fn analyze(files: &[ast::File], target: &Target) -> Analysis {
     let mut checker = Checker::new(target);
     let program = checker.run(files);
@@ -61,7 +61,7 @@ pub fn analyze(files: &[ast::File], target: &Target) -> Analysis {
     }
 }
 
-/// 全局声明。
+/// 全局声明
 #[derive(Clone, Copy)]
 pub(crate) enum Global<'a> {
     Enum(&'a ast::EnumDecl),
@@ -109,7 +109,7 @@ impl<'a> Checker<'a> {
         self.error("V9000", format!("{what}尚未支持"), span, "");
     }
 
-    /// 声明层级不允许保留`debug`条件。
+    /// 声明层级不允许保留`debug`条件
     pub fn prune_decls<T>(&mut self, nodes: &'a [ast::Node<T>]) -> Vec<&'a T> {
         let pruned = self.cfg.prune(nodes, &mut self.diags);
         let mut out = Vec::new();

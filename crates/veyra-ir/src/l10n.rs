@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only AND LicenseRef-Commons-Clause-1.0
 // Copyright (C) 2026 Doctor-yoi
 
-//! 本地化中间表示。文案模板使用`{name}`占位，`\{`表示字面量花括号。
+//! 本地化中间表示。文案模板使用`{name}`占位，`\{`表示字面量花括号
 
 use indexmap::IndexMap;
 
-/// CLDR复数类别。
+/// CLDR复数类别
 pub const PLURAL_CATEGORIES: [&str; 6] = ["zero", "one", "two", "few", "many", "other"];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -20,13 +20,13 @@ pub struct LocArg {
     pub ty: LocArgType,
 }
 
-/// 复数形式，键为复数类别。
+/// 复数形式，键为复数类别
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PluralForms {
     pub forms: IndexMap<String, String>,
 }
 
-/// 源码中声明的一条文案。
+/// 源码中声明的一条文案
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LocString {
     pub key: String,
@@ -36,14 +36,14 @@ pub struct LocString {
     pub plural: Option<PluralForms>,
 }
 
-/// 某个语言的翻译。
+/// 某个语言的翻译
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Translation {
     Text(String),
     Plural(IndexMap<String, String>),
 }
 
-/// 合并翻译后的单条文案。
+/// 合并翻译后的单条文案
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CatalogEntry {
     pub string: LocString,
@@ -51,7 +51,7 @@ pub struct CatalogEntry {
     pub translations: IndexMap<String, Translation>,
 }
 
-/// 全部文案与翻译，是各平台资源文件的唯一来源。
+/// 全部文案与翻译，是各平台资源文件的唯一来源
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Catalog {
     pub source_locale: String,
@@ -71,7 +71,7 @@ pub enum Segment {
     Arg(String),
 }
 
-/// 拆分文案模板。
+/// 拆分文案模板
 pub fn parse_template(text: &str) -> Result<Vec<Segment>, String> {
     let mut out = Vec::new();
     let mut buf = String::new();

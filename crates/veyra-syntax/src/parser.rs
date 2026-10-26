@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only AND LicenseRef-Commons-Clause-1.0
 // Copyright (C) 2026 Doctor-yoi
 
-//! 递归下降解析器。语法对换行不敏感，出错时跳到下一行或块尾继续解析。
+//! 递归下降解析器。语法对换行不敏感，出错时跳到下一行或块尾继续解析
 
 use veyra_diagnostics::{Diagnostic, Diagnostics, FileId, Span};
 
@@ -123,7 +123,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// 跳过一段内容直到下一行或给定的结束符，括号内的内容整体跳过。
+    /// 跳过一段内容直到下一行或给定的结束符，括号内的内容整体跳过
     fn recover(&mut self, end: Option<T>) {
         let start = self.pos;
         loop {
@@ -170,7 +170,7 @@ impl<'a> Parser<'a> {
 
     // ---- 条件编译与节点列表 ----
 
-    /// 解析节点序列，遇到`end`或同层的`#elseif/#else/#endif`时停止。
+    /// 解析节点序列，遇到`end`或同层的`#elseif/#else/#endif`时停止
     fn nodes<U>(&mut self, end: Option<T>, f: ItemFn<'_, 'a, U>) -> Vec<Node<U>> {
         let mut out = Vec::new();
         loop {
@@ -855,7 +855,7 @@ impl<'a> Parser<'a> {
         out
     }
 
-    /// 预读判断`#if`后是否为修饰符。
+    /// 预读判断`#if`后是否为修饰符
     fn cfg_wraps_modifier(&mut self) -> bool {
         let saved_pos = self.pos;
         let saved = std::mem::take(&mut self.diags);

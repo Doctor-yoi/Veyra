@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only AND LicenseRef-Commons-Clause-1.0
 // Copyright (C) 2026 Doctor-yoi
 
-/// 按行写入并自动缩进的代码缓冲区。
+/// 按行写入并自动缩进的代码缓冲区
 #[derive(Clone, Debug)]
 pub struct CodeWriter {
     buf: String,
@@ -18,7 +18,7 @@ impl CodeWriter {
         }
     }
 
-    /// 写入一行，多行文本会逐行缩进。
+    /// 写入一行，多行文本会逐行缩进
     pub fn line(&mut self, text: impl AsRef<str>) {
         for l in text.as_ref().split('\n') {
             if l.is_empty() {
@@ -33,7 +33,7 @@ impl CodeWriter {
         }
     }
 
-    /// 写入空行，连续空行只保留一个。
+    /// 写入空行，连续空行只保留一个
     pub fn blank(&mut self) {
         if !self.buf.is_empty() && !self.buf.ends_with("\n\n") {
             self.buf.push('\n');
@@ -48,7 +48,7 @@ impl CodeWriter {
         self.level = self.level.saturating_sub(1);
     }
 
-    /// 写入`open`，在缩进内执行`body`，再写入`close`。
+    /// 写入`open`，在缩进内执行`body`，再写入`close`
     pub fn block(
         &mut self,
         open: impl AsRef<str>,

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only AND LicenseRef-Commons-Clause-1.0
 // Copyright (C) 2026 Doctor-yoi
 
-//! 条件编译求值与裁剪。
+//! 条件编译求值与裁剪
 //!
 //! 平台与自定义flag在编译期确定；`debug`无法在编译期确定，
 //! 因此每个保留下来的节点都带一个`debug`约束：
-//! `None`表示无约束，`Some(true)`表示仅调试构建，`Some(false)`表示仅发布构建。
+//! `None`表示无约束，`Some(true)`表示仅调试构建，`Some(false)`表示仅发布构建
 
 use veyra_diagnostics::{Diagnostic, Diagnostics, Span};
 use veyra_ir::Platform;
@@ -29,7 +29,7 @@ impl<'t> Cfg<'t> {
         Self { target }
     }
 
-    /// 检查条件中的名称是否都已声明。
+    /// 检查条件中的名称是否都已声明
     fn validate(&self, expr: &CfgExpr, diags: &mut Diagnostics) {
         match expr {
             CfgExpr::Ident(id) => {
@@ -72,7 +72,7 @@ impl<'t> Cfg<'t> {
         }
     }
 
-    /// 返回条件在`debug=false`与`debug=true`下的取值。
+    /// 返回条件在`debug=false`与`debug=true`下的取值
     fn truth(&self, expr: &CfgExpr) -> [bool; 2] {
         [self.eval(expr, false), self.eval(expr, true)]
     }
@@ -87,7 +87,7 @@ impl<'t> Cfg<'t> {
         out
     }
 
-    /// `allowed[i]`表示`debug == (i == 1)`时该层是否生效。
+    /// `allowed[i]`表示`debug == (i == 1)`时该层是否生效
     fn prune_into<'a, T>(
         &self,
         nodes: &'a [Node<T>],

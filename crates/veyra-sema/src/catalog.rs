@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only AND LicenseRef-Commons-Clause-1.0
 // Copyright (C) 2026 Doctor-yoi
 
-//! 内置组件与修饰符的参数表。
+//! 内置组件与修饰符的参数表
 
 use veyra_ir::{Builtin, ModifierKind, Type};
 
-/// 参数种类。
+/// 参数种类
 #[derive(Clone, Debug)]
 pub(crate) enum ArgKind {
     /// 显示文本：String表达式或loc/plural

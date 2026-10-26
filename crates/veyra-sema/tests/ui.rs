@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only AND LicenseRef-Commons-Clause-1.0
 // Copyright (C) 2026 Doctor-yoi
 
-//! 逐个检查tests/ui下的.vey文件，并对诊断输出做快照。
+//! 逐个检查tests/ui下的.vey文件，并对诊断输出做快照
 
 use std::fs;
 use std::path::Path;

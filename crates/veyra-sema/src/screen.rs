@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only AND LicenseRef-Commons-Clause-1.0
 // Copyright (C) 2026 Doctor-yoi
 
-//! screen检查：依赖、状态、派生状态、命令与视图。
+//! screen检查：依赖、状态、派生状态、命令与视图
 
 use indexmap::{IndexMap, IndexSet};
 use veyra_diagnostics::{Diagnostic, Span};

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only AND LicenseRef-Commons-Clause-1.0
 // Copyright (C) 2026 Doctor-yoi
 
-/// 按`.`、`_`、`-`切分单词。
+/// 按`.`、`_`、`-`切分单词
 fn words(s: &str) -> Vec<String> {
     s.split(['.', '_', '-', ' '])
         .filter(|w| !w.is_empty())
@@ -50,7 +50,7 @@ pub fn snake_case(s: &str) -> String {
     out
 }
 
-/// 与语言关键字冲突时加反引号。
+/// 与语言关键字冲突时加反引号
 pub fn escape_ident(name: &str, keywords: &[&str]) -> String {
     if keywords.contains(&name) {
         format!("`{name}`")

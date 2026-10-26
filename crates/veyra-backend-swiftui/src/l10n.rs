@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only AND LicenseRef-Commons-Clause-1.0
 // Copyright (C) 2026 Doctor-yoi
 
-//! `L10n`访问器与String Catalog。
+//! `L10n`访问器与String Catalog
 
 use indexmap::IndexMap;
 use serde_json::{Map, Value, json};
@@ -14,7 +14,7 @@ use veyra_ir::{
 use crate::header;
 use crate::swift::{self, l10n_name};
 
-/// 检查key转换后的访问器名称是否冲突。
+/// 检查key转换后的访问器名称是否冲突
 pub(crate) fn check_names(catalog: &Catalog) -> Result<IndexMap<String, String>, Diagnostics> {
     let mut seen: IndexMap<String, String> = IndexMap::new();
     let mut diags = Diagnostics::new();
@@ -45,7 +45,7 @@ fn arg_type(t: LocArgType) -> &'static str {
     }
 }
 
-/// 生成`String(localized:defaultValue:)`的插值字面量。
+/// 生成`String(localized:defaultValue:)`的插值字面量
 fn interpolation(s: &LocString) -> String {
     let segments =
         parse_template(&s.source).unwrap_or_else(|_| vec![Segment::Text(s.source.clone())]);
@@ -70,7 +70,7 @@ pub(crate) fn accessors(
 ) -> String {
     let mut w = CodeWriter::new("    ");
     header(&mut w, &["Foundation"]);
-    w.line("/// 类型安全的本地化文案，翻译存放在String Catalog中。");
+    w.line("/// Type-safe localized strings, translations live in the String Catalog");
     w.block("enum L10n {", "}", |w| {
         for (i, e) in catalog.entries.iter().enumerate() {
             if i > 0 {
@@ -106,7 +106,7 @@ pub(crate) fn accessors(
     w.finish()
 }
 
-/// 把`{name}`模板转换为printf风格的格式串。
+/// 把`{name}`模板转换为printf风格的格式串
 pub(crate) fn format_string(text: &str, s: &LocString) -> String {
     let Ok(segments) = parse_template(text) else {
         return text.to_string();

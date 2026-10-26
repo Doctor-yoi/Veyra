@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only AND LicenseRef-Commons-Clause-1.0
 // Copyright (C) 2026 Doctor-yoi
 
-//! 视图树到SwiftUI的映射。
+//! 视图树到SwiftUI的映射
 
 use veyra_codegen::CodeWriter;
 use veyra_ir::{
@@ -11,7 +11,7 @@ use veyra_ir::{
 
 use crate::swift::{self, ExprCx, double_literal, plain_string_arg};
 
-/// 视图生成上下文。
+/// 视图生成上下文
 #[derive(Clone, Copy)]
 pub(crate) struct ViewCx<'a> {
     pub expr: ExprCx<'a>,
@@ -31,7 +31,7 @@ pub(crate) fn nodes(w: &mut CodeWriter, cx: ViewCx, nodes: &[ViewNode]) {
     }
 }
 
-/// 输出if分支体，并把单个嵌套if展开为else if。
+/// 输出if分支体，并把单个嵌套if展开为else if
 fn if_tail(w: &mut CodeWriter, cx: ViewCx, then: &[ViewNode], else_: &[ViewNode]) {
     w.indent();
     nodes(w, cx, then);
@@ -66,7 +66,7 @@ fn text_arg(cx: ViewCx, v: Option<&Value>) -> String {
     }
 }
 
-/// 命令分发语句。
+/// 命令分发语句
 pub(crate) fn action(cx: ViewCx, a: Option<&Value>) -> String {
     match a.and_then(Value::as_action) {
         Some(ActionRef::Dispatch {
@@ -90,7 +90,7 @@ pub(crate) fn action(cx: ViewCx, a: Option<&Value>) -> String {
     }
 }
 
-/// 经过setter写入的Binding。
+/// 经过setter写入的Binding
 fn binding(cx: ViewCx, b: Option<&Value>) -> String {
     match b.and_then(Value::as_binding) {
         Some(BindingRef::State { field, setter, .. }) => format!(
@@ -265,7 +265,7 @@ fn is_stack(el: &Element) -> bool {
     )
 }
 
-/// 闭包之后的修饰符与右花括号对齐。
+/// 闭包之后的修饰符与右花括号对齐
 fn trailing_modifiers(w: &mut CodeWriter, cx: ViewCx, mods: &[Modifier]) {
     for m in mods {
         for line in modifier(cx, m) {

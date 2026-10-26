@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only AND LicenseRef-Commons-Clause-1.0
 // Copyright (C) 2026 Doctor-yoi
 
-//! Veyra语义层中间表示（Semantic MVVM IR）。
+//! Veyra语义层中间表示（Semantic MVVM IR）
 //!
 //! IR是前端与各平台后端之间的契约：
 //!
@@ -9,7 +9,7 @@
 //! - 所有名称已解析，所有表达式都带类型
 //! - 读取、双向绑定、命令分发三种交互已区分为不同的节点
 //!
-//! 后端只需把IR映射为对应平台的惯用写法，不再做语义检查。
+//! 后端只需把IR映射为对应平台的惯用写法，不再做语义检查
 
 mod l10n;
 mod types;
@@ -22,7 +22,7 @@ pub use l10n::{
 pub use types::Type;
 pub use view::*;
 
-/// 目标平台。
+/// 目标平台
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Platform {
     Ios,
@@ -33,7 +33,7 @@ pub enum Platform {
 impl Platform {
     pub const ALL: [Platform; 3] = [Platform::Ios, Platform::Android, Platform::Harmony];
 
-    /// 条件编译中使用的名称。
+    /// 条件编译中使用的名称
     pub fn cfg_name(self) -> &'static str {
         match self {
             Platform::Ios => "ios",
@@ -47,7 +47,7 @@ impl Platform {
     }
 }
 
-/// 单个目标平台的完整程序。
+/// 单个目标平台的完整程序
 #[derive(Clone, Debug, Default)]
 pub struct Program {
     pub enums: Vec<EnumDef>,
@@ -84,7 +84,7 @@ pub struct ModelDef {
 }
 
 impl ModelDef {
-    /// 含`id`字段的模型在Swift中实现`Identifiable`。
+    /// 含`id`字段的模型在Swift中实现`Identifiable`
     pub fn id_field(&self) -> Option<&FieldDef> {
         self.fields.iter().find(|f| f.name == "id")
     }
@@ -111,7 +111,7 @@ pub struct RepositoryDef {
     pub methods: Vec<MethodDef>,
 }
 
-/// 被注入到ViewModel的依赖类别。
+/// 被注入到ViewModel的依赖类别
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum InjectKind {
     Repository,
@@ -133,7 +133,7 @@ pub struct StateField {
 }
 
 impl StateField {
-    /// 双向绑定对应的契约方法名，例如`setQuery`。
+    /// 双向绑定对应的契约方法名，例如`setQuery`
     pub fn setter_name(&self) -> Option<String> {
         self.writable.then(|| setter_name(&self.name))
     }
@@ -177,7 +177,7 @@ impl ScreenDef {
     }
 }
 
-/// 组件参数类型。
+/// 组件参数类型
 #[derive(Clone, Debug, PartialEq)]
 pub enum ComponentParamType {
     Value(Type),

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only AND LicenseRef-Commons-Clause-1.0
 // Copyright (C) 2026 Doctor-yoi
 
-//! 视图树检查：组件参数、子节点、修饰符。
+//! 视图树检查：组件参数、子节点、修饰符
 
 use indexmap::IndexMap;
 use veyra_diagnostics::{Diagnostic, Span};
@@ -246,7 +246,7 @@ impl<'a> Checker<'a> {
         out
     }
 
-    /// 按参数表匹配实参。
+    /// 按参数表匹配实参
     pub(crate) fn match_args(
         &mut self,
         sc: &Scope,

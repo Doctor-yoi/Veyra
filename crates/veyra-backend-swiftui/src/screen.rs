@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only AND LicenseRef-Commons-Clause-1.0
 // Copyright (C) 2026 Doctor-yoi
 
-//! 单个screen的Swift文件。
+//! 单个screen的Swift文件
 
 use veyra_codegen::{CodeWriter, USER_OWNED_NOTICE};
 use veyra_ir::ScreenDef;
@@ -13,7 +13,10 @@ use crate::{Options, default_value, dependency_name, header, params};
 pub(crate) fn state(s: &ScreenDef) -> String {
     let mut w = CodeWriter::new("    ");
     header(&mut w, &["Foundation", "Observation"]);
-    w.line(format!("/// {}的可观察状态，只由ViewModel写入。", s.name));
+    w.line(format!(
+        "/// Observable state of {}, written only by the view model",
+        s.name
+    ));
     w.line("@MainActor");
     w.line("@Observable");
     w.block(format!("final class {}State {{", s.name), "}", |w| {
@@ -53,7 +56,10 @@ fn action_sig(a: &veyra_ir::ActionDef) -> String {
 pub(crate) fn contract(s: &ScreenDef) -> String {
     let mut w = CodeWriter::new("    ");
     header(&mut w, &["Foundation"]);
-    w.line(format!("/// {}的ViewModel契约，View只依赖该协议。", s.name));
+    w.line(format!(
+        "/// View model contract of {}, the only type the view depends on",
+        s.name
+    ));
     w.line("@MainActor");
     w.block(
         format!("protocol {}ViewModelContract: AnyObject {{", s.name),
@@ -82,7 +88,7 @@ pub(crate) fn contract(s: &ScreenDef) -> String {
     let setters: Vec<_> = s.writable_fields().collect();
     if !setters.is_empty() {
         w.blank();
-        w.line("/// 默认直接写入state，需要校验或过滤时在ViewModel中重写。");
+        w.line("/// Default setters write state directly, override them in the view model to validate input");
         w.block(
             format!("extension {}ViewModelContract {{", s.name),
             "}",
@@ -145,7 +151,7 @@ pub(crate) fn root(s: &ScreenDef, _options: &Options) -> String {
     let mut w = CodeWriter::new("    ");
     header(&mut w, &["SwiftUI"]);
     w.line(format!(
-        "/// {}的组装入口：创建ViewModel并注入依赖。",
+        "/// Entry point of {}, creates the view model and injects dependencies",
         s.name
     ));
     w.block(format!("struct {}Root: View {{", s.name), "}", |w| {
@@ -167,7 +173,7 @@ pub(crate) fn root(s: &ScreenDef, _options: &Options) -> String {
             w.indent();
             w.block("Color.clear.onAppear {", "}", |w| {
                 w.block("guard let dependencies else {", "}", |w| {
-                    w.line("assertionFailure(\"未注入VeyraDependencies，请在上层视图调用veyraDependencies(_:)\")");
+                    w.line("assertionFailure(\"VeyraDependencies is missing, call veyraDependencies(_:) on an ancestor view\")");
                     w.line("return");
                 });
                 w.line(format!("viewModel = {}", construct(s, "dependencies")));
@@ -211,7 +217,7 @@ pub(crate) fn view_model(s: &ScreenDef, _options: &Options) -> String {
             for a in &s.actions {
                 w.blank();
                 w.block(format!("{} {{", action_sig(a)), "}", |w| {
-                    w.line("// 在此实现业务逻辑");
+                    w.line("// Implement business logic here");
                 });
             }
         },

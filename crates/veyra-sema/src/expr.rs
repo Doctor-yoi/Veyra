@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only AND LicenseRef-Commons-Clause-1.0
 // Copyright (C) 2026 Doctor-yoi
 
-//! 表达式、命令分发与绑定的检查。
+//! 表达式、命令分发与绑定的检查
 
 use indexmap::{IndexMap, IndexSet};
 use veyra_diagnostics::{Diagnostic, Span};
@@ -24,7 +24,7 @@ pub(crate) struct ActionInfo {
     pub is_async: bool,
 }
 
-/// screen中可被表达式引用的成员。
+/// screen中可被表达式引用的成员
 #[derive(Default)]
 pub(crate) struct ScreenInfo {
     pub state: IndexMap<String, StateInfo>,
@@ -63,7 +63,7 @@ impl<'s> Scope<'s> {
     }
 }
 
-/// 整数字面量在需要Double的位置提升为Double。
+/// 整数字面量在需要Double的位置提升为Double
 pub(crate) fn promote(e: ir::Expr) -> ir::Expr {
     match e.kind {
         ExprKind::Int(v) => ir::Expr::new(ExprKind::Double(v as f64), Type::Double),
@@ -85,7 +85,7 @@ fn is_int_literal(e: &ir::Expr) -> bool {
     }
 }
 
-/// 普通字符串中`\{`与`\}`还原为花括号。
+/// 普通字符串中`\{`与`\}`还原为花括号
 fn plain_string(s: &str) -> String {
     s.replace("\\{", "{").replace("\\}", "}")
 }
@@ -130,7 +130,7 @@ impl<'a> Checker<'a> {
         );
     }
 
-    /// 检查表达式，`expected`用于推断字面量与隐式成员并校验结果类型。
+    /// 检查表达式，`expected`用于推断字面量与隐式成员并校验结果类型
     pub(crate) fn expr(&mut self, sc: &Scope, e: &ast::Expr, expected: Option<&Type>) -> ir::Expr {
         let mut out = self.expr_inner(sc, e, expected);
         if let Some(exp) = expected {
@@ -667,7 +667,7 @@ impl<'a> Checker<'a> {
         self.strings.insert(s.key.clone(), (s, span));
     }
 
-    /// 解析action位置的表达式。
+    /// 解析action位置的表达式
     pub(crate) fn action_ref(&mut self, sc: &Scope, e: &ast::Expr) -> Option<ActionRef> {
         let screen = sc.screen();
         let (name, args, name_span) = match &e.kind {
@@ -768,7 +768,7 @@ impl<'a> Checker<'a> {
         None
     }
 
-    /// 解析绑定位置的表达式，`ty`为控件要求的类型。
+    /// 解析绑定位置的表达式，`ty`为控件要求的类型
     pub(crate) fn binding_ref(
         &mut self,
         sc: &Scope,
@@ -868,7 +868,7 @@ fn irop_symbol(op: ir::BinaryOp) -> &'static str {
     }
 }
 
-/// 常量表达式：字面量、列表、枚举成员与nil。
+/// 常量表达式：字面量、列表、枚举成员与nil
 fn is_constant(e: &ast::Expr) -> bool {
     match &e.kind {
         A::Int(_)

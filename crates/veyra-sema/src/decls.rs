@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only AND LicenseRef-Commons-Clause-1.0
 // Copyright (C) 2026 Doctor-yoi
 
-//! 枚举、模型与repository声明的检查，以及类型解析。
+//! 枚举、模型与repository声明的检查，以及类型解析
 
 use indexmap::{IndexMap, IndexSet};
 use veyra_diagnostics::Diagnostic;
@@ -10,7 +10,7 @@ use veyra_syntax::ast::{self, TypeExpr, TypeExprKind};
 
 use crate::{Checker, Global};
 
-/// 类型出现的位置，决定是否允许Stream。
+/// 类型出现的位置，决定是否允许Stream
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TypePos {
     Value,
@@ -117,7 +117,7 @@ impl<'a> Checker<'a> {
         out
     }
 
-    /// 结构体不能直接或经由可选字段包含自身，列表字段不受限制。
+    /// 结构体不能直接或经由可选字段包含自身，列表字段不受限制
     fn check_model_cycles(&mut self, globals: &[Global<'a>]) {
         fn direct_deps(ty: &Type, out: &mut Vec<String>) {
             match ty {
