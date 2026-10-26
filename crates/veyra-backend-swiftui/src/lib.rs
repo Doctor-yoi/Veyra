@@ -404,12 +404,16 @@ fn platform_support() -> String {
     let mut w = CodeWriter::new("    ");
     header(&mut w, &["SwiftUI"]);
     w.block("extension View {", "}", |w| {
-        w.line("/// Applies Liquid Glass on iOS 26 and later, earlier systems keep the view unchanged");
+        w.line(
+            "/// Applies Liquid Glass on iOS 26 and later, earlier systems keep the view unchanged",
+        );
         w.line("@ViewBuilder");
         w.block("func veyraGlassEffect() -> some View {", "}", |w| {
             // 旧版Xcode的SDK中没有glassEffect，按编译器版本区分
             w.line("#if compiler(>=6.2)");
-            w.block("if #available(iOS 26.0, *) {", "} else {", |w| w.line("glassEffect()"));
+            w.block("if #available(iOS 26.0, *) {", "} else {", |w| {
+                w.line("glassEffect()")
+            });
             w.indent();
             w.line("self");
             w.dedent();
