@@ -8,9 +8,9 @@ use veyra_diagnostics::{Diagnostic, Span};
 use veyra_ir::{self as ir, Builtin, ComponentParamType, ElementKind, ModifierKind, Type, Value};
 use veyra_syntax::ast::{self, Arg, ExprKind as A};
 
-use crate::Checker;
 use crate::catalog::{self, ArgKind, ArgSpec, Children};
 use crate::expr::{Scope, promote};
+use crate::{Checker, NativeLint};
 
 impl<'a> Checker<'a> {
     pub(crate) fn view_nodes(
@@ -19,23 +19,18 @@ impl<'a> Checker<'a> {
         nodes: &'a [ast::Node<ast::ViewNode>],
     ) -> Vec<ir::ViewNode> {
         let pruned = self.cfg.prune(nodes, &mut self.diags);
-        let mut out = Vec::new();
+        let mut items: Vec<(Option<bool>, ir::ViewNode)> = Vec::new();
         for p in pruned {
-            if p.debug.is_some() {
-                self.unsupported("view中的`debug`条件", p.cond_span);
-                continue;
-            }
-            match p.item {
-                ast::ViewNode::Element(el) => {
-                    if let Some(e) = self.element(sc, el) {
-                        out.push(ir::ViewNode::Element(e));
-                    }
-                }
-                ast::ViewNode::If(node) => out.push(self.if_node(sc, node)),
-                ast::ViewNode::Native(n) => self.unsupported("native代码块", n.span),
+            let node = match p.item {
+                ast::ViewNode::Element(el) => self.element(sc, el).map(ir::ViewNode::Element),
+                ast::ViewNode::If(node) => Some(self.if_node(sc, node)),
+                ast::ViewNode::Native(n) => self.native(sc, n),
+            };
+            if let Some(node) = node {
+                items.push((p.debug, node));
             }
         }
-        out
+        group_debug(items)
     }
 
     fn if_node(&mut self, sc: &mut Scope, node: &'a ast::IfNode) -> ir::ViewNode {
@@ -51,8 +46,7 @@ impl<'a> Checker<'a> {
 
     fn element(&mut self, sc: &mut Scope, el: &'a ast::Element) -> Option<ir::Element> {
         if el.path.len() > 1 {
-            self.unsupported("平台专属组件", el.span);
-            return None;
+            return self.platform_element(sc, el);
         }
         let name = &el.path[0];
         if self.components.contains_key(&name.name) {
@@ -242,6 +236,191 @@ impl<'a> Checker<'a> {
         })
     }
 
+    /// 平台命名空间需与当前目标一致
+    fn check_platform(&mut self, ns: &ast::Ident, full: &str, span: Span) -> bool {
+        let Some(platform) = ir::Platform::from_cfg_name(&ns.name) else {
+            self.error(
+                "V1011",
+                format!("未知的平台`{}`", ns.name),
+                ns.span,
+                "可用的平台：ios、android",
+            );
+            return false;
+        };
+        if platform != self.target.platform {
+            self.diags.push(
+                Diagnostic::error("V6004", format!("`{full}`只能用于{}", ns.name))
+                    .with_label(span, "")
+                    .with_note(format!("请放在`#if {}`条件块中", ns.name)),
+            );
+            return false;
+        }
+        true
+    }
+
+    fn platform_element(&mut self, sc: &mut Scope, el: &'a ast::Element) -> Option<ir::Element> {
+        let full = el.path_string();
+        let [ns, name] = el.path.as_slice() else {
+            self.error("V1011", format!("未知的组件`{full}`"), el.span, "");
+            return None;
+        };
+        if !self.check_platform(ns, &full, el.span) {
+            return None;
+        }
+        let Some((kind, spec)) = catalog::platform_element(&ns.name, &name.name) else {
+            let all = if ns.name == "ios" {
+                catalog::IOS_ELEMENTS
+            } else {
+                catalog::ANDROID_ELEMENTS
+            };
+            self.diags.push(
+                Diagnostic::error("V1011", format!("未知的组件`{full}`"))
+                    .with_label(name.span, "")
+                    .with_note(format!("{}专属组件：{}", ns.name, all.join("、"))),
+            );
+            return None;
+        };
+        let args = self.match_args(
+            sc,
+            &spec.args,
+            &el.args,
+            name.span,
+            &format!("组件`{full}`"),
+        );
+        if let Some(c) = &el.closure {
+            self.error("V2034", format!("组件`{full}`不接受子组件"), c.span, "");
+        }
+        let modifiers = self.modifiers(sc, &el.modifiers, None);
+        Some(ir::Element {
+            kind,
+            args,
+            children: Vec::new(),
+            item: None,
+            modifiers,
+        })
+    }
+
+    fn platform_modifier(&mut self, m: &ast::Modifier) -> Option<ModifierKind> {
+        let full = format!(".{}", ast::path_string(&m.path));
+        let [ns, name] = m.path.as_slice() else {
+            self.error("V1012", format!("未知的修饰符`{full}`"), m.span, "");
+            return None;
+        };
+        if !self.check_platform(ns, &full, m.span) {
+            return None;
+        }
+        let kind = catalog::platform_modifier(&ns.name, &name.name);
+        if kind.is_none() {
+            let all = if ns.name == "ios" {
+                catalog::IOS_MODIFIERS
+            } else {
+                catalog::ANDROID_MODIFIERS
+            };
+            self.diags.push(
+                Diagnostic::error("V1012", format!("未知的修饰符`{full}`"))
+                    .with_label(name.span, "")
+                    .with_note(format!("{}专属修饰符：{}", ns.name, all.join("、"))),
+            );
+        }
+        kind
+    }
+
+    /// `native ios { """...""" }`，`{{name}}`替换为状态读取或命令入口
+    fn native(&mut self, sc: &mut Scope, n: &'a ast::NativeNode) -> Option<ir::ViewNode> {
+        if !self.check_platform(&n.platform, &format!("native {}", n.platform.name), n.span) {
+            return None;
+        }
+        match self.target.native {
+            NativeLint::Allow => {}
+            NativeLint::Warn => self.diags.push(
+                Diagnostic::warning("V6010", "native代码块不受Veyra的类型检查与MVVM约束")
+                    .with_label(n.span, "")
+                    .with_note("可在veyra.toml的[lint]中设置native = \"allow\"或\"deny\""),
+            ),
+            NativeLint::Deny => {
+                self.error(
+                    "V6010",
+                    "项目禁止使用native代码块",
+                    n.span,
+                    "veyra.toml中[lint] native = \"deny\"",
+                );
+                return None;
+            }
+        }
+        let mut segments = Vec::new();
+        let mut rest = n.code.as_str();
+        while let Some(start) = rest.find("{{") {
+            if start > 0 {
+                segments.push(ir::NativeSegment::Text(rest[..start].to_string()));
+            }
+            let after = &rest[start + 2..];
+            let Some(end) = after.find("}}") else {
+                self.error("V6011", "native代码中的`{{`缺少`}}`", n.code_span, "");
+                return None;
+            };
+            let path: Vec<&str> = after[..end].trim().split('.').collect();
+            if let Some(seg) = self.native_ref(sc, &path, n.code_span) {
+                segments.push(seg);
+            }
+            rest = &after[end + 2..];
+        }
+        if !rest.is_empty() {
+            segments.push(ir::NativeSegment::Text(rest.to_string()));
+        }
+        Some(ir::ViewNode::Native(segments))
+    }
+
+    fn native_ref(
+        &mut self,
+        sc: &mut Scope,
+        path: &[&str],
+        span: Span,
+    ) -> Option<ir::NativeSegment> {
+        let valid = |p: &str| {
+            p.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_')
+                && p.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+        };
+        if path.is_empty() || !path.iter().all(|p| valid(p)) {
+            self.error(
+                "V6011",
+                format!("无效的占位符`{{{{{}}}}}`", path.join(".")),
+                span,
+                "占位符只能是名称或字段路径",
+            );
+            return None;
+        }
+        if path.len() == 1 {
+            if sc.is_action(path[0]) {
+                return Some(ir::NativeSegment::Action(path[0].to_string()));
+            }
+            if sc.is_action_param(path[0]) {
+                return Some(ir::NativeSegment::Callback(path[0].to_string()));
+            }
+        }
+        // 组装成表达式交给常规检查
+        let mut e = ast::Expr {
+            kind: A::Ident(path[0].to_string()),
+            span,
+        };
+        for p in &path[1..] {
+            e = ast::Expr {
+                kind: A::Member(
+                    Box::new(e),
+                    ast::Ident {
+                        name: p.to_string(),
+                        span,
+                    },
+                ),
+                span,
+            };
+        }
+        let v = self.expr(sc, &e, None);
+        if v.ty.is_unknown() {
+            return None;
+        }
+        Some(ir::NativeSegment::Expr(v))
+    }
+
     fn check_key_path(&mut self, elem: &Type, key: &str, el: &ast::Element) {
         let span = el
             .args
@@ -279,16 +458,16 @@ impl<'a> Checker<'a> {
         let mut out = Vec::new();
         for p in pruned {
             let m = p.item;
-            if p.debug.is_some() {
-                self.unsupported("修饰符上的`debug`条件", p.cond_span);
-                continue;
-            }
-            if m.path.len() > 1 {
-                self.unsupported("平台专属修饰符", m.span);
-                continue;
-            }
-            let name = &m.path[0];
-            let Some(kind) = ModifierKind::from_name(&name.name) else {
+            let name = m.path.last().unwrap_or(&m.path[0]);
+            let kind = if m.path.len() > 1 {
+                match self.platform_modifier(m) {
+                    Some(k) => Some(k),
+                    None => continue,
+                }
+            } else {
+                ModifierKind::from_name(&name.name)
+            };
+            let Some(kind) = kind else {
                 self.diags.push(
                     Diagnostic::error("V1012", format!("未知的修饰符`.{}`", name.name))
                         .with_label(name.span, "")
@@ -329,7 +508,19 @@ impl<'a> Checker<'a> {
                 name.span,
                 &format!("修饰符`.{}`", name.name),
             );
-            out.push(ir::Modifier { kind, args });
+            if p.debug.is_some() && catalog::is_parameter_modifier(kind) {
+                self.diags.push(
+                    Diagnostic::error("V6003", format!("`.{}`不能放在`debug`条件中", name.name))
+                        .with_label(name.span, "")
+                        .with_note("该修饰符在Compose中会生成为组件参数，无法按构建类型切换"),
+                );
+                continue;
+            }
+            out.push(ir::Modifier {
+                kind,
+                args,
+                debug: p.debug,
+            });
         }
         out
     }
@@ -460,4 +651,38 @@ impl<'a> Checker<'a> {
             },
         }
     }
+}
+
+/// 把连续的debug节点合并为`ViewNode::Debug`
+fn group_debug(items: Vec<(Option<bool>, ir::ViewNode)>) -> Vec<ir::ViewNode> {
+    let mut out = Vec::new();
+    let mut then = Vec::new();
+    let mut else_ = Vec::new();
+    let flush = |out: &mut Vec<ir::ViewNode>,
+                 then: &mut Vec<ir::ViewNode>,
+                 else_: &mut Vec<ir::ViewNode>| {
+        if !then.is_empty() || !else_.is_empty() {
+            out.push(ir::ViewNode::Debug {
+                then: std::mem::take(then),
+                else_: std::mem::take(else_),
+            });
+        }
+    };
+    for (debug, node) in items {
+        match debug {
+            None => {
+                flush(&mut out, &mut then, &mut else_);
+                out.push(node);
+            }
+            Some(true) => {
+                if !else_.is_empty() {
+                    flush(&mut out, &mut then, &mut else_);
+                }
+                then.push(node);
+            }
+            Some(false) => else_.push(node),
+        }
+    }
+    flush(&mut out, &mut then, &mut else_);
+    out
 }

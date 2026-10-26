@@ -100,10 +100,11 @@ impl<'a> Checker<'a> {
                         }
                         uses(&el.children, out);
                     }
-                    ViewNode::If { then, else_, .. } => {
+                    ViewNode::If { then, else_, .. } | ViewNode::Debug { then, else_ } => {
                         uses(then, out);
                         uses(else_, out);
                     }
+                    ViewNode::Native(_) => {}
                 }
             }
         }

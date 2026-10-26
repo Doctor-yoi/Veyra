@@ -38,6 +38,11 @@ enum L10n {
         String(localized: "schedule.search", defaultValue: "搜索课程", table: "Veyra")
     }
 
+    /// 分享
+    static var scheduleShare: String {
+        String(localized: "schedule.share", defaultValue: "分享", table: "Veyra")
+    }
+
     /// 我的课表
     static var scheduleTitle: String {
         String(localized: "schedule.title", defaultValue: "我的课表", table: "Veyra")

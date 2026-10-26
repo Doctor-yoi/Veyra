@@ -89,6 +89,40 @@ impl Program {
         }
     }
 
+    /// 是否使用了满足条件的修饰符
+    pub fn any_modifier(&self, pred: impl Fn(&Modifier) -> bool) -> bool {
+        let mut found = false;
+        let mut check = |el: &Element| found |= el.modifiers.iter().any(&pred);
+        for s in &self.screens {
+            s.view.iter().for_each(|n| n.walk_elements(&mut check));
+        }
+        for c in &self.components {
+            c.body.iter().for_each(|n| n.walk_elements(&mut check));
+        }
+        found
+    }
+
+    /// 是否存在满足条件的视图节点
+    pub fn any_node(&self, pred: impl Fn(&ViewNode) -> bool) -> bool {
+        fn visit(n: &ViewNode, pred: &dyn Fn(&ViewNode) -> bool) -> bool {
+            if pred(n) {
+                return true;
+            }
+            match n {
+                ViewNode::Element(el) => el.children.iter().any(|c| visit(c, pred)),
+                ViewNode::If { then, else_, .. } | ViewNode::Debug { then, else_ } => {
+                    then.iter().chain(else_).any(|c| visit(c, pred))
+                }
+                ViewNode::Native(_) => false,
+            }
+        }
+        self.screens
+            .iter()
+            .flat_map(|s| &s.view)
+            .chain(self.components.iter().flat_map(|c| &c.body))
+            .any(|n| visit(n, &pred))
+    }
+
     pub fn any_expr(&self, pred: impl Fn(&Expr) -> bool) -> bool {
         let mut found = false;
         self.walk_exprs(&mut |e| found |= pred(e));

@@ -3,7 +3,10 @@
 
 //! 内置组件与修饰符的参数表
 
-use veyra_ir::{Builtin, ModifierKind, Type};
+use veyra_ir::{
+    AndroidElement, AndroidModifier, Builtin, ElementKind, IosElement, IosModifier, ModifierKind,
+    Type,
+};
 
 /// 参数种类
 #[derive(Clone, Debug)]
@@ -160,9 +163,94 @@ const CONTROLS: &[Builtin] = &[
     Builtin::Slider,
 ];
 
+const AUTOCAPITALIZATION: &[&str] = &["never", "words", "sentences", "characters"];
+const LIST_STYLES: &[&str] = &["plain", "inset", "insetGrouped", "grouped", "sidebar"];
+const KEYBOARD_DISMISS: &[&str] = &["immediately", "interactively", "never"];
+const TEXT_INPUTS: &[Builtin] = &[Builtin::TextField, Builtin::SecureField];
+const LISTS: &[Builtin] = &[Builtin::List];
+const SCROLLABLES: &[Builtin] = &[Builtin::ScrollView, Builtin::List];
+
+/// 平台专属组件，`platform`为`ios`或`android`
+pub(crate) fn platform_element(platform: &str, name: &str) -> Option<(ElementKind, ElementSpec)> {
+    use ArgKind::*;
+    let (kind, args) = match (platform, name) {
+        ("ios", "ShareLink") => (
+            ElementKind::Ios(IosElement::ShareLink),
+            vec![req("_", Text), req("item", Expr(Type::String))],
+        ),
+        ("android", "FloatingActionButton") => (
+            ElementKind::Android(AndroidElement::FloatingActionButton),
+            vec![req("_", Text), req("action", Action)],
+        ),
+        _ => return None,
+    };
+    Some((
+        kind,
+        ElementSpec {
+            args,
+            children: Children::None,
+        },
+    ))
+}
+
+pub(crate) const IOS_ELEMENTS: &[&str] = &["ShareLink"];
+pub(crate) const ANDROID_ELEMENTS: &[&str] = &["FloatingActionButton"];
+pub(crate) const IOS_MODIFIERS: &[&str] = &[
+    "glassEffect",
+    "navigationTitle",
+    "textInputAutocapitalization",
+    "listStyle",
+    "scrollDismissesKeyboard",
+];
+pub(crate) const ANDROID_MODIFIERS: &[&str] = &["imePadding", "systemBarsPadding", "testTag"];
+
+/// 平台专属修饰符
+pub(crate) fn platform_modifier(platform: &str, name: &str) -> Option<ModifierKind> {
+    Some(match (platform, name) {
+        ("ios", "glassEffect") => ModifierKind::Ios(IosModifier::GlassEffect),
+        ("ios", "navigationTitle") => ModifierKind::Ios(IosModifier::NavigationTitle),
+        ("ios", "textInputAutocapitalization") => {
+            ModifierKind::Ios(IosModifier::TextInputAutocapitalization)
+        }
+        ("ios", "listStyle") => ModifierKind::Ios(IosModifier::ListStyle),
+        ("ios", "scrollDismissesKeyboard") => {
+            ModifierKind::Ios(IosModifier::ScrollDismissesKeyboard)
+        }
+        ("android", "imePadding") => ModifierKind::Android(AndroidModifier::ImePadding),
+        ("android", "systemBarsPadding") => {
+            ModifierKind::Android(AndroidModifier::SystemBarsPadding)
+        }
+        ("android", "testTag") => ModifierKind::Android(AndroidModifier::TestTag),
+        _ => return None,
+    })
+}
+
+/// 以组件参数形式生成、无法按debug条件切换的修饰符
+pub(crate) fn is_parameter_modifier(kind: ModifierKind) -> bool {
+    matches!(
+        kind,
+        ModifierKind::Font | ModifierKind::Foreground | ModifierKind::Disabled
+    )
+}
+
 pub(crate) fn modifier(kind: ModifierKind) -> ModifierSpec {
     use ArgKind::*;
     let (args, applies_to) = match kind {
+        ModifierKind::Ios(m) => match m {
+            IosModifier::GlassEffect => (vec![], None),
+            IosModifier::NavigationTitle => (vec![req("_", Text)], None),
+            IosModifier::TextInputAutocapitalization => {
+                (vec![req("_", Token(AUTOCAPITALIZATION))], Some(TEXT_INPUTS))
+            }
+            IosModifier::ListStyle => (vec![req("_", Token(LIST_STYLES))], Some(LISTS)),
+            IosModifier::ScrollDismissesKeyboard => {
+                (vec![req("_", Token(KEYBOARD_DISMISS))], Some(SCROLLABLES))
+            }
+        },
+        ModifierKind::Android(m) => match m {
+            AndroidModifier::ImePadding | AndroidModifier::SystemBarsPadding => (vec![], None),
+            AndroidModifier::TestTag => (vec![req("_", Expr(Type::String))], None),
+        },
         ModifierKind::Padding => (vec![opt("_", Number)], None),
         ModifierKind::Font => (vec![req("_", Token(FONTS))], Some(TEXT_ONLY)),
         ModifierKind::Foreground => (vec![req("_", Token(COLORS))], Some(TEXT_ONLY)),

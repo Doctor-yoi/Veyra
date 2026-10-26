@@ -1,0 +1,30 @@
+// 平台扩展
+screen Home {
+  state {
+    title: String = ""
+  }
+  actions {
+    go()
+  }
+  view {
+    Column {
+      ios.ShareLink("分享", item: title)
+      #if ios
+      ios.Unknown()
+      Text("x").ios.blur()
+      #endif
+      windows.Button()
+      Text("x")
+        #if debug
+        .font(.title)
+        #endif
+      #if ios
+      native ios {
+        """
+        Text({{missing}}) {{go}} {{title.count}} {{a b}}
+        """
+      }
+      #endif
+    }
+  }
+}

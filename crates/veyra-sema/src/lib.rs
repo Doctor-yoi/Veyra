@@ -32,12 +32,22 @@ use veyra_syntax::ast;
 
 use crate::cfg::Cfg;
 
+/// native代码块的检查级别
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum NativeLint {
+    Allow,
+    #[default]
+    Warn,
+    Deny,
+}
+
 /// 一次检查的目标
 #[derive(Clone, Debug)]
 pub struct Target {
     pub platform: Platform,
     /// veyra.toml中声明的自定义flag及取值
     pub flags: IndexMap<String, bool>,
+    pub native: NativeLint,
 }
 
 impl Target {
@@ -45,6 +55,7 @@ impl Target {
         Self {
             platform,
             flags: IndexMap::new(),
+            native: NativeLint::Warn,
         }
     }
 }
@@ -81,6 +92,7 @@ pub(crate) enum Global<'a> {
 }
 
 pub(crate) struct Checker<'a> {
+    pub target: &'a Target,
     pub cfg: Cfg<'a>,
     pub diags: Diagnostics,
     pub globals: IndexMap<String, (Global<'a>, Span)>,
@@ -99,6 +111,7 @@ pub(crate) struct Checker<'a> {
 impl<'a> Checker<'a> {
     fn new(target: &'a Target) -> Self {
         Self {
+            target,
             cfg: Cfg::new(target),
             diags: Diagnostics::new(),
             globals: IndexMap::new(),
@@ -123,10 +136,6 @@ impl<'a> Checker<'a> {
     ) {
         self.diags
             .push(Diagnostic::error(code, message).with_label(span, label));
-    }
-
-    pub fn unsupported(&mut self, what: &str, span: Span) {
-        self.error("V9000", format!("{what}尚未支持"), span, "");
     }
 
     /// 声明层级不允许保留`debug`条件

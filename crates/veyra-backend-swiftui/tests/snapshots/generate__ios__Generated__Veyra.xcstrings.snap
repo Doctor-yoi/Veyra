@@ -125,6 +125,23 @@ expression: f.contents
         }
       }
     },
+    "schedule.share": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "分享"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "分享"
+          }
+        }
+      }
+    },
     "schedule.title": {
       "extractionState": "manual",
       "localizations": {

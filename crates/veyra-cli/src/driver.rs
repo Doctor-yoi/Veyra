@@ -10,8 +10,8 @@ use veyra_backend_swiftui::SwiftUiBackend;
 use veyra_codegen::{Backend, BackendInput, OutputFile};
 use veyra_diagnostics::{Diagnostic, Diagnostics, RenderOptions, SourceMap, render_all};
 use veyra_ir::Program;
-use veyra_project::Project;
-use veyra_sema::{Target, analyze};
+use veyra_project::{LintLevel, Project};
+use veyra_sema::{NativeLint, Target, analyze};
 
 use crate::BuildArgs;
 
@@ -173,9 +173,15 @@ fn compile(dir: &Path, args: &BuildArgs, r: &mut Reporter) -> Option<Compiled> {
     let mut programs = Vec::new();
     let mut seen = Diagnostics::new();
     for backend in backends {
+        let native = match project.config.lint.native {
+            LintLevel::Allow => NativeLint::Allow,
+            LintLevel::Warn => NativeLint::Warn,
+            LintLevel::Deny => NativeLint::Deny,
+        };
         let target = Target {
             platform: backend.platform(),
             flags: flags.clone(),
+            native,
         };
         let analysis = analyze(&asts, &target);
         // 多个平台报告的相同诊断只保留一份

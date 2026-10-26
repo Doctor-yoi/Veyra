@@ -65,6 +65,14 @@ impl<'s> Scope<'s> {
         }
     }
 
+    pub fn is_action(&self, name: &str) -> bool {
+        self.screen().is_some_and(|s| s.actions.contains_key(name))
+    }
+
+    pub fn is_action_param(&self, name: &str) -> bool {
+        matches!(self.component_param(name), Some(ComponentParamType::Action))
+    }
+
     fn component_param(&self, name: &str) -> Option<&'s ComponentParamType> {
         match self.owner {
             Owner::Component(ps) => ps.iter().find(|p| p.name == name).map(|p| &p.ty),
