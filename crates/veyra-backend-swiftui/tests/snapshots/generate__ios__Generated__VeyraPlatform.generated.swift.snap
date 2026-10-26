@@ -10,10 +10,14 @@ extension View {
     /// Applies Liquid Glass on iOS 26 and later, earlier systems keep the view unchanged
     @ViewBuilder
     func veyraGlassEffect() -> some View {
+        #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
             glassEffect()
         } else {
             self
         }
+        #else
+        self
+        #endif
     }
 }
