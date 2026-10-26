@@ -34,6 +34,18 @@ screen Schedule {
   actions {
     refresh() async
     openCourse(id: String)
+    stop()
+  }
+
+  effects {
+    navigateToDetail(id: String)
+    showToast(message: String)
+    close
+  }
+
+  lifecycle {
+    onAppear: refresh
+    onDisappear: stop
   }
 
   view {

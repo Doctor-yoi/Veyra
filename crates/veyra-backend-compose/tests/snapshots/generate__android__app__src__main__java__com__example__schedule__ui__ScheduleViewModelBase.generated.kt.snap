@@ -7,15 +7,25 @@ expression: f.contents
 package com.example.schedule.ui
 
 import androidx.lifecycle.ViewModel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 
 /** Base view model of Schedule, implement the actions in a subclass */
 abstract class ScheduleViewModelBase : ViewModel(), ScheduleActions {
     protected val mutableState = MutableStateFlow(ScheduleUiState())
     val state: StateFlow<ScheduleUiState> = mutableState.asStateFlow()
+    private val effectChannel = Channel<ScheduleEffect>(Channel.BUFFERED)
+    val effects: Flow<ScheduleEffect> = effectChannel.receiveAsFlow()
+
+    /** Sends an effect to the route */
+    protected fun emit(effect: ScheduleEffect) {
+        effectChannel.trySend(effect)
+    }
 
     override fun setQuery(value: String) {
         mutableState.update { it.copy(query = value) }

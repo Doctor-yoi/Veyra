@@ -74,7 +74,9 @@ Declarations:
 | --- | --- |
 | `enum`, `model` | Value types shared by all layers |
 | `repository` | Data access contract, implemented natively on each platform |
-| `screen` | A page with `inject`, `state`, `computed`, `actions` and `view` |
+| `screen` | A page with `inject`, `state`, `computed`, `actions`, `effects`, `lifecycle` and `view` |
+
+`effects` declares one-off events such as navigation. The view model emits them with `emit`, and the root view or route receives them through `onEffect`, so views never handle them. `lifecycle` dispatches actions when a screen appears or disappears.
 
 Conditional compilation selects platform-specific content. Platform conditions and custom flags declared in `[flags]` are resolved at compile time, and each platform is type checked separately:
 

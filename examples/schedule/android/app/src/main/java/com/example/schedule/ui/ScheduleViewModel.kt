@@ -30,6 +30,6 @@ class ScheduleViewModel(
     }
 
     override fun openCourse(id: String) {
-        // Navigation is handled by the app
+        emit(ScheduleEffect.ShowCourse(id = id))
     }
 }
