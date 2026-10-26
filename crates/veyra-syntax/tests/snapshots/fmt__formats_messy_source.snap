@@ -1,0 +1,53 @@
+---
+source: crates/veyra-syntax/tests/fmt.rs
+expression: "fmt(r#\"import \"b.vey\"\nimport \"a.vey\"\n// 枚举\nenum   Kind{a,b}\nmodel M{x:Int  // 行尾注释\ny : List<String>?}\n\n\n\nscreen S{\ninject r:Repo\nstate{q:String=\"\" @writable\nn:Int=1}\nactions{go( id:String )async}\nlifecycle{onAppear:go(\"x\")}\nview{Column(spacing:8){Text(loc(\"a.b\",\"x\")).font(.title)\n#if ios\nText(\"i\")\n#else\nText(\"o\")\n#endif\nif q.isEmpty{Spacer()}else if n>1{Divider()}else{Text(q)}\nList(items,key:.id){item in Text(item.name).padding().background(.red)\n}\n/* 块注释 */\n}.padding(16)}\n}\n\"#)"
+---
+import (
+  "b.vey"
+  "a.vey"
+)
+
+// 枚举
+enum Kind { a, b }
+model M {
+  x: Int  // 行尾注释
+  y: List<String>?
+}
+
+screen S {
+  inject r: Repo
+  state {
+    q: String = "" @writable
+    n: Int = 1
+  }
+  actions {
+    go(id: String) async
+  }
+  lifecycle {
+    onAppear: go("x")
+  }
+  view {
+    Column(spacing: 8) {
+      Text(loc("a.b", "x")).font(.title)
+      #if ios
+      Text("i")
+      #else
+      Text("o")
+      #endif
+      if q.isEmpty {
+        Spacer()
+      } else if n > 1 {
+        Divider()
+      } else {
+        Text(q)
+      }
+      List(items, key: .id) { item in
+        Text(item.name)
+          .padding()
+          .background(.red)
+      }
+      /* 块注释 */
+    }
+    .padding(16)
+  }
+}

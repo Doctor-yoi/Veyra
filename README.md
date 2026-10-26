@@ -169,6 +169,7 @@ Dependencies declared with `inject` only ever reach view models. By default the 
 | `veyra init [path]` | Create a project |
 | `veyra check` | Check sources without writing files |
 | `veyra build` | Check sources and generate code |
+| `veyra fmt [--check] [files]` | Format sources, keeping comments |
 | `veyra l10n status` | Show translation progress |
 | `veyra l10n prune` | Remove translations whose keys no longer exist |
 

@@ -51,8 +51,7 @@ screen Schedule {
       #if ios
       Toggle(loc("schedule.compact", "紧凑模式"), isOn: bind(compact))
       #endif
-      Button(loc("schedule.refresh", "刷新"), action: refresh)
-        .disabled(!canRefresh)
+      Button(loc("schedule.refresh", "刷新"), action: refresh).disabled(!canRefresh)
       if isRefreshing {
         Progress()
       } else if items.isEmpty {
