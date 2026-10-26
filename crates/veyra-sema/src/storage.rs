@@ -39,6 +39,7 @@ fn storable(t: &Type) -> bool {
 
 impl<'a> Checker<'a> {
     pub(crate) fn check_entity(&mut self, d: &'a ast::EntityDecl) {
+        self.current = d.span.file;
         for attr in &d.attrs {
             if attr.name.name != "persistent" {
                 self.error(
@@ -134,7 +135,8 @@ impl<'a> Checker<'a> {
     }
 
     pub(crate) fn check_store(&mut self, d: &'a ast::StoreDecl) {
-        let entity = match self.globals.get(&d.entity.name).map(|(g, _)| *g) {
+        self.current = d.span.file;
+        let entity = match self.lookup(&d.entity.name, d.entity.span) {
             Some(Global::Entity(_)) => d.entity.name.clone(),
             Some(_) => {
                 self.error(
@@ -475,6 +477,7 @@ impl<'a> Checker<'a> {
 
 impl<'a> Checker<'a> {
     pub(crate) fn check_settings(&mut self, d: &'a ast::FieldsDecl) {
+        self.current = d.span.file;
         let mut fields: Vec<ir::SettingField> = Vec::new();
         for f in self.prune_decls(&d.fields) {
             self.check_member_name(&f.name);
@@ -542,6 +545,7 @@ impl<'a> Checker<'a> {
     }
 
     pub(crate) fn check_secure(&mut self, d: &'a ast::FieldsDecl) {
+        self.current = d.span.file;
         let mut fields: Vec<FieldDef> = Vec::new();
         for f in self.prune_decls(&d.fields) {
             self.check_member_name(&f.name);

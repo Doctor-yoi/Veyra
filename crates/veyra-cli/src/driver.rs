@@ -3,15 +3,17 @@
 
 //! 编译流程的编排
 
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use veyra_backend_compose::ComposeBackend;
 use veyra_backend_swiftui::SwiftUiBackend;
 use veyra_codegen::{Backend, BackendInput, OutputFile};
-use veyra_diagnostics::{Diagnostic, Diagnostics, RenderOptions, SourceMap, render_all};
+use veyra_diagnostics::{Diagnostic, Diagnostics, FileId, RenderOptions, SourceMap, render_all};
 use veyra_ir::Program;
 use veyra_project::{LintLevel, Project};
 use veyra_sema::{NativeLint, Target, analyze};
+use veyra_syntax::ast;
 
 use crate::BuildArgs;
 
@@ -151,26 +153,17 @@ fn compile(dir: &Path, args: &BuildArgs, r: &mut Reporter) -> Option<Compiled> {
 
     let mut asts = Vec::new();
     for rel in &files {
-        let text = match std::fs::read_to_string(project.root.join(rel)) {
-            Ok(t) => t,
-            Err(e) => {
-                r.push(Diagnostic::error(
-                    "V9004",
-                    format!("无法读取{}：{e}", rel.display()),
-                ));
-                continue;
-            }
-        };
-        let id = r.sources.add(rel, text.as_str());
-        let parsed = veyra_syntax::parse(id, &text);
-        r.extend(parsed.diagnostics);
-        asts.push(parsed.file);
+        if let Some(file) = load(&project.root, &slash(rel), r) {
+            asts.push(file);
+        }
     }
+    resolve_imports(&project.root, &mut asts, r);
     if r.has_errors() {
         return None;
     }
 
     let mut programs = Vec::new();
+    let mut programs_used = HashSet::new();
     let mut seen = Diagnostics::new();
     for backend in backends {
         let native = match project.config.lint.native {
@@ -191,8 +184,10 @@ fn compile(dir: &Path, args: &BuildArgs, r: &mut Reporter) -> Option<Compiled> {
                 r.push(d);
             }
         }
+        programs_used.extend(analysis.used_imports);
         programs.push((backend, analysis.program));
     }
+    report_unused_imports(&asts, &programs_used, r);
     if r.has_errors() {
         return None;
     }
@@ -215,6 +210,128 @@ fn compile(dir: &Path, args: &BuildArgs, r: &mut Reporter) -> Option<Compiled> {
         programs,
         sync,
     })
+}
+
+fn slash(path: &Path) -> String {
+    path.to_string_lossy().replace('\\', "/")
+}
+
+/// 读取并解析一个源文件，`rel`为相对于项目根目录的路径
+fn load(root: &Path, rel: &str, r: &mut Reporter) -> Option<ast::File> {
+    let text = match std::fs::read_to_string(root.join(rel)) {
+        Ok(t) => t,
+        Err(e) => {
+            r.push(Diagnostic::error("V9004", format!("无法读取{rel}：{e}")));
+            return None;
+        }
+    };
+    let id = r.sources.add(rel, text.as_str());
+    let parsed = veyra_syntax::parse(id, &text);
+    r.extend(parsed.diagnostics);
+    let mut file = parsed.file;
+    file.path = rel.to_string();
+    Some(file)
+}
+
+/// 规范化`dir/path`，返回None表示路径越出了项目根目录
+fn join_relative(dir: &str, path: &str) -> Option<String> {
+    let mut parts: Vec<&str> = dir.split('/').filter(|p| !p.is_empty()).collect();
+    for seg in path.split('/') {
+        match seg {
+            "" | "." => {}
+            ".." => {
+                parts.pop()?;
+            }
+            other => parts.push(other),
+        }
+    }
+    Some(parts.join("/"))
+}
+
+/// 解析import路径，未在sources中的文件会被一并加载
+fn resolve_imports(root: &Path, asts: &mut Vec<ast::File>, r: &mut Reporter) {
+    let mut index: HashMap<String, FileId> = asts.iter().map(|f| (f.path.clone(), f.id)).collect();
+    let mut i = 0;
+    while i < asts.len() {
+        let from = asts[i].path.clone();
+        let dir = from
+            .rsplit_once('/')
+            .map(|(d, _)| d.to_string())
+            .unwrap_or_default();
+        let mut resolved = Vec::new();
+        let imports: Vec<(String, veyra_diagnostics::Span)> = asts[i]
+            .imports
+            .iter()
+            .map(|im| (im.path.clone(), im.span))
+            .collect();
+        for (path, span) in &imports {
+            let (path, span) = (path.as_str(), *span);
+            if !path.ends_with(".vey") {
+                r.push(
+                    Diagnostic::error("V1030", "import的路径必须以.vey结尾").with_label(span, ""),
+                );
+                resolved.push(None);
+                continue;
+            }
+            let Some(target) = join_relative(&dir, path) else {
+                r.push(
+                    Diagnostic::error("V1030", "import的路径越出了项目目录").with_label(span, ""),
+                );
+                resolved.push(None);
+                continue;
+            };
+            if target == from {
+                r.push(Diagnostic::error("V1031", "文件不能import自身").with_label(span, ""));
+                resolved.push(None);
+                continue;
+            }
+            let id = match index.get(&target) {
+                Some(id) => Some(*id),
+                None if root.join(&target).is_file() => match load(root, &target, r) {
+                    Some(file) => {
+                        let id = file.id;
+                        index.insert(target.clone(), id);
+                        asts.push(file);
+                        Some(id)
+                    }
+                    None => None,
+                },
+                None => {
+                    r.push(
+                        Diagnostic::error("V1030", format!("找不到import的文件{target}"))
+                            .with_label(span, "")
+                            .with_note("路径相对于当前文件所在的目录"),
+                    );
+                    None
+                }
+            };
+            if id.is_some() && resolved.contains(&id) {
+                r.push(Diagnostic::warning("V1032", "重复的import").with_label(span, ""));
+            }
+            resolved.push(id);
+        }
+        for (import, id) in asts[i].imports.iter_mut().zip(resolved) {
+            import.resolved = id;
+        }
+        i += 1;
+    }
+}
+
+/// 全部平台都没有用到的import
+fn report_unused_imports(asts: &[ast::File], used: &HashSet<(FileId, FileId)>, r: &mut Reporter) {
+    for file in asts {
+        for import in &file.imports {
+            if let Some(target) = import.resolved
+                && !used.contains(&(file.id, target))
+            {
+                r.push(
+                    Diagnostic::warning("V1033", format!("未使用的import`{}`", import.path))
+                        .with_label(import.span, "")
+                        .with_note("当前文件没有用到其中声明的类型"),
+                );
+            }
+        }
+    }
 }
 
 pub(crate) fn check(dir: &Path, args: &BuildArgs, color: bool) -> bool {

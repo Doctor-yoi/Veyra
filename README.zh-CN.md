@@ -68,6 +68,18 @@ View中的交互只有三种形式，编译器会在生成任何平台代码之�
 
 View不能调用任意函数、修改状态或访问注入的依赖，有副作用的操作都放在action中，由ViewModel实现。
 
+每个文件只能看到自己的声明以及import的文件中的声明。import的路径相对于当前文件，且不会传递：
+
+```
+import "models.vey"
+import (
+  "stores/NoteStore.vey"
+  "../shared/Theme.vey"
+)
+```
+
+使用未import的文件中的类型会报错，诊断信息会给出需要添加的`import`。不在`sources`中的被import文件会自动加载，未使用的import会给出警告。由于每个平台的生成代码位于同一个模块中，所有声明仍共享同一个命名空间。
+
 声明：
 
 | 声明 | 用途 |

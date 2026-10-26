@@ -205,6 +205,7 @@ impl<'a> Checker<'a> {
                 if let A::Ident(n) = &base.kind
                     && self.lookup_local(sc, n).is_none()
                     && matches!(self.globals.get(n.as_str()), Some((Global::Enum(_), _)))
+                    && matches!(self.lookup(n, base.span), Some(Global::Enum(_)))
                 {
                     return self.enum_case(n.clone(), name);
                 }

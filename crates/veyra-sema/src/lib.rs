@@ -23,7 +23,9 @@ mod storage;
 mod view;
 
 use indexmap::IndexMap;
-use veyra_diagnostics::{Diagnostic, Diagnostics, Span};
+use std::collections::{HashMap, HashSet};
+
+use veyra_diagnostics::{Diagnostic, Diagnostics, FileId, Span};
 use veyra_ir::{
     ComponentParam, EntityDef, EnumDef, LocString, ModelDef, Platform, Program, RepositoryDef,
     SecureDef, SettingsDef, StoreDef,
@@ -65,6 +67,8 @@ impl Target {
 pub struct Analysis {
     pub program: Program,
     pub diagnostics: Diagnostics,
+    /// 实际用到的import，用于在全部平台检查完后报告未使用的import
+    pub used_imports: HashSet<(FileId, FileId)>,
 }
 
 /// 对一组源文件执行语义检查
@@ -74,6 +78,7 @@ pub fn analyze(files: &[ast::File], target: &Target) -> Analysis {
     Analysis {
         program,
         diagnostics: checker.diags.sorted(),
+        used_imports: checker.used_imports,
     }
 }
 
@@ -106,6 +111,13 @@ pub(crate) struct Checker<'a> {
     /// 组件签名
     pub components: IndexMap<String, Vec<ComponentParam>>,
     pub strings: IndexMap<String, (LocString, Span)>,
+    /// 正在检查的声明所在的文件
+    pub current: FileId,
+    /// 每个文件可见的其他文件，即直接import的文件
+    pub visible: HashMap<FileId, HashSet<FileId>>,
+    pub paths: HashMap<FileId, String>,
+    /// 实际用到的import，键为(导入方, 被导入方)
+    pub used_imports: HashSet<(FileId, FileId)>,
 }
 
 impl<'a> Checker<'a> {
@@ -124,6 +136,10 @@ impl<'a> Checker<'a> {
             secures: IndexMap::new(),
             components: IndexMap::new(),
             strings: IndexMap::new(),
+            current: FileId::default(),
+            visible: HashMap::new(),
+            paths: HashMap::new(),
+            used_imports: HashSet::new(),
         }
     }
 
@@ -157,6 +173,16 @@ impl<'a> Checker<'a> {
     }
 
     fn run(&mut self, files: &'a [ast::File]) -> Program {
+        for file in files {
+            let set = file
+                .imports
+                .iter()
+                .filter_map(|i| i.resolved)
+                .filter(|f| *f != file.id)
+                .collect();
+            self.visible.insert(file.id, set);
+            self.paths.insert(file.id, file.path.clone());
+        }
         for file in files {
             for item in self.prune_decls(&file.items) {
                 self.register(item);
@@ -222,6 +248,38 @@ impl<'a> Checker<'a> {
         }
         self.check_type_name(name);
         self.globals.insert(name.name.clone(), (global, name.span));
+    }
+
+    /// 按名称查找声明，并检查当前文件是否可见
+    pub fn lookup(&mut self, name: &str, span: Span) -> Option<Global<'a>> {
+        let (g, decl) = *self.globals.get(name)?;
+        let file = decl.file;
+        if file == self.current {
+            return Some(g);
+        }
+        if self
+            .visible
+            .get(&self.current)
+            .is_some_and(|v| v.contains(&file))
+        {
+            self.used_imports.insert((self.current, file));
+            return Some(g);
+        }
+        let target = self.paths.get(&file).cloned().unwrap_or_default();
+        let from = self.paths.get(&self.current).cloned().unwrap_or_default();
+        self.diags.push(
+            Diagnostic::error(
+                "V1034",
+                format!("`{name}`声明在{target}中，当前文件没有import它"),
+            )
+            .with_label(span, "")
+            .with_secondary(decl, "声明于此")
+            .with_note(format!(
+                "在文件开头添加`import \"{}\"`",
+                relative_path(&from, &target)
+            )),
+        );
+        Some(g)
     }
 
     pub fn check_type_name(&mut self, name: &ast::Ident) {
@@ -304,4 +362,34 @@ pub(crate) fn is_builtin_type(name: &str) -> bool {
         name,
         "Bool" | "Int" | "Double" | "String" | "Date" | "List" | "Stream" | "Action" | "Binding"
     )
+}
+
+/// 计算从`from`所在目录到`to`的相对路径，路径分隔符为`/`
+pub(crate) fn relative_path(from: &str, to: &str) -> String {
+    let from_dir: Vec<&str> = from.split('/').filter(|p| !p.is_empty()).collect();
+    let from_dir = &from_dir[..from_dir.len().saturating_sub(1)];
+    let target: Vec<&str> = to.split('/').filter(|p| !p.is_empty()).collect();
+    let common = from_dir
+        .iter()
+        .zip(&target)
+        .take_while(|(a, b)| a == b)
+        .count();
+    let mut parts: Vec<&str> = vec![".."; from_dir.len() - common];
+    parts.extend(&target[common..]);
+    parts.join("/")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::relative_path;
+
+    #[test]
+    fn computes_relative_paths() {
+        assert_eq!(relative_path("ui/a.vey", "ui/b.vey"), "b.vey");
+        assert_eq!(
+            relative_path("ui/screens/a.vey", "ui/stores/b.vey"),
+            "../stores/b.vey"
+        );
+        assert_eq!(relative_path("a.vey", "ui/b.vey"), "ui/b.vey");
+    }
 }

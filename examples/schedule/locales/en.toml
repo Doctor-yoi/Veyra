@@ -32,10 +32,10 @@
 "settings.title" = "Settings"
 
 # 添加
-"notes.add" = ""
+"notes.add" = "Add"
 
 # 写点什么
-"notes.draft" = ""
+"notes.draft" = "Write something"
 
 # 退出登录
-"settings.sign_out" = ""
+"settings.sign_out" = "Sign out"
