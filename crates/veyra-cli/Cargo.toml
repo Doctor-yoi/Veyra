@@ -1,5 +1,6 @@
 [package]
 name = "veyra-cli"
+description = "Veyra UI DSL编译器命令行工具"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,7 +9,23 @@ license-file.workspace = true
 repository.workspace = true
 homepage.workspace = true
 
+[[bin]]
+name = "veyra"
+path = "src/main.rs"
+
 [dependencies]
+clap.workspace = true
+indexmap.workspace = true
+toml.workspace = true
+veyra-backend-compose.workspace = true
+veyra-backend-swiftui.workspace = true
+veyra-codegen.workspace = true
+veyra-diagnostics.workspace = true
+veyra-ir.workspace = true
+veyra-l10n.workspace = true
+veyra-project.workspace = true
+veyra-sema.workspace = true
+veyra-syntax.workspace = true
 
 [lints]
 workspace = true
