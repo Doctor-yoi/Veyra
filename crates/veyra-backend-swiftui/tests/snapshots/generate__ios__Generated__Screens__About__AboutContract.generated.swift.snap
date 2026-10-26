@@ -1,0 +1,13 @@
+---
+source: crates/veyra-backend-swiftui/tests/generate.rs
+expression: f.contents
+---
+// 此文件由Veyra生成，请勿手动修改。
+
+import Foundation
+
+/// About的ViewModel契约，View只依赖该协议。
+@MainActor
+protocol AboutViewModelContract: AnyObject {
+    var state: AboutState { get }
+}

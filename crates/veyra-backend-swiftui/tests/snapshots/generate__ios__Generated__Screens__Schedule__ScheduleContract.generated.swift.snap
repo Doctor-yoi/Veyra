@@ -1,0 +1,40 @@
+---
+source: crates/veyra-backend-swiftui/tests/generate.rs
+expression: f.contents
+---
+// 此文件由Veyra生成，请勿手动修改。
+
+import Foundation
+
+/// Schedule的ViewModel契约，View只依赖该协议。
+@MainActor
+protocol ScheduleViewModelContract: AnyObject {
+    var state: ScheduleState { get }
+
+    func setQuery(_ value: String)
+    func setVolume(_ value: Double)
+    func setNotify(_ value: Bool)
+    func setPassword(_ value: String)
+
+    func refresh() async
+    func openCourse(id: String)
+}
+
+/// 默认直接写入state，需要校验或过滤时在ViewModel中重写。
+extension ScheduleViewModelContract {
+    func setQuery(_ value: String) {
+        state.query = value
+    }
+
+    func setVolume(_ value: Double) {
+        state.volume = value
+    }
+
+    func setNotify(_ value: Bool) {
+        state.notify = value
+    }
+
+    func setPassword(_ value: String) {
+        state.password = value
+    }
+}

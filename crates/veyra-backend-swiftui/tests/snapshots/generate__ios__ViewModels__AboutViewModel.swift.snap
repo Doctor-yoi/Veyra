@@ -1,0 +1,12 @@
+---
+source: crates/veyra-backend-swiftui/tests/generate.rs
+expression: f.contents
+---
+// 此文件由Veyra创建，之后不会再被覆盖。
+
+import Foundation
+
+@MainActor
+final class AboutViewModel: AboutViewModelContract {
+    let state = AboutState()
+}

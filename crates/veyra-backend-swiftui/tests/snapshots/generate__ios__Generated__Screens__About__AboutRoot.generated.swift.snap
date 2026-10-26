@@ -1,0 +1,16 @@
+---
+source: crates/veyra-backend-swiftui/tests/generate.rs
+expression: f.contents
+---
+// 此文件由Veyra生成，请勿手动修改。
+
+import SwiftUI
+
+/// About的组装入口：创建ViewModel并注入依赖。
+struct AboutRoot: View {
+    @State private var viewModel = AboutViewModel()
+
+    var body: some View {
+        AboutView(viewModel: viewModel)
+    }
+}

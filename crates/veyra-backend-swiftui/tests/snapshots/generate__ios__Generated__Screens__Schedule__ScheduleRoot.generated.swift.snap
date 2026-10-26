@@ -1,0 +1,27 @@
+---
+source: crates/veyra-backend-swiftui/tests/generate.rs
+expression: f.contents
+---
+// 此文件由Veyra生成，请勿手动修改。
+
+import SwiftUI
+
+/// Schedule的组装入口：创建ViewModel并注入依赖。
+struct ScheduleRoot: View {
+    @Environment(\.veyraDependencies) private var dependencies
+    @State private var viewModel: ScheduleViewModel?
+
+    var body: some View {
+        if let viewModel {
+            ScheduleView(viewModel: viewModel)
+        } else {
+            Color.clear.onAppear {
+                guard let dependencies else {
+                    assertionFailure("未注入VeyraDependencies，请在上层视图调用veyraDependencies(_:)")
+                    return
+                }
+                viewModel = ScheduleViewModel(courses: dependencies.courseRepository)
+            }
+        }
+    }
+}

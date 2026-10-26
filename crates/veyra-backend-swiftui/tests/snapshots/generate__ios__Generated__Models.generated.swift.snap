@@ -1,0 +1,20 @@
+---
+source: crates/veyra-backend-swiftui/tests/generate.rs
+expression: f.contents
+---
+// 此文件由Veyra生成，请勿手动修改。
+
+import Foundation
+
+enum CourseKind: String, Codable, CaseIterable, Hashable, Sendable {
+    case lecture
+    case lab
+}
+
+struct Course: Codable, Hashable, Sendable, Identifiable {
+    var id: String
+    var name: String
+    var credits: Double
+    var kind: CourseKind
+    var teacher: String?
+}

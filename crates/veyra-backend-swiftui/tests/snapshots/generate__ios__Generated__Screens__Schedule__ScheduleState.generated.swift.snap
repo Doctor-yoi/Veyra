@@ -1,0 +1,26 @@
+---
+source: crates/veyra-backend-swiftui/tests/generate.rs
+expression: f.contents
+---
+// 此文件由Veyra生成，请勿手动修改。
+
+import Foundation
+import Observation
+
+/// Schedule的可观察状态，只由ViewModel写入。
+@MainActor
+@Observable
+final class ScheduleState {
+    var query: String = ""
+    var items: [Course] = []
+    var isRefreshing: Bool = false
+    var volume: Double = 0.5
+    var notify: Bool = true
+    var password: String = ""
+
+    var count: Int { items.count }
+    var canRefresh: Bool { !isRefreshing && count >= 0 }
+    var subtitle: String { query.isEmpty ? "全部" : query }
+
+    init() {}
+}

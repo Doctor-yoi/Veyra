@@ -1,0 +1,13 @@
+---
+source: crates/veyra-backend-swiftui/tests/generate.rs
+expression: f.contents
+---
+// 此文件由Veyra生成，请勿手动修改。
+
+import Foundation
+
+@MainActor
+protocol CourseRepository: AnyObject {
+    func getCourses() async throws -> [Course]
+    func observeCourses() -> AsyncStream<[Course]>
+}

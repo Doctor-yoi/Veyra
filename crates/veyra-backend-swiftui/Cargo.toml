@@ -1,0 +1,28 @@
+[package]
+name = "veyra-backend-swiftui"
+description = "Veyra的SwiftUI代码生成后端"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license-file.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[dependencies]
+indexmap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+veyra-codegen.workspace = true
+veyra-diagnostics.workspace = true
+veyra-ir.workspace = true
+
+[dev-dependencies]
+indexmap.workspace = true
+insta.workspace = true
+veyra-sema.workspace = true
+veyra-syntax.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,24 @@
+---
+source: crates/veyra-backend-swiftui/tests/generate.rs
+expression: f.contents
+---
+// 此文件由Veyra生成，请勿手动修改。
+
+import SwiftUI
+
+/// 应用提供给各screen的依赖，由组装层传给ViewModel。
+@MainActor
+protocol VeyraDependencies: Sendable {
+    var courseRepository: any CourseRepository { get }
+}
+
+extension EnvironmentValues {
+    @Entry var veyraDependencies: (any VeyraDependencies)? = nil
+}
+
+extension View {
+    /// 向子视图注入依赖。
+    func veyraDependencies(_ dependencies: any VeyraDependencies) -> some View {
+        environment(\.veyraDependencies, dependencies)
+    }
+}

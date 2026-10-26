@@ -1,0 +1,57 @@
+---
+source: crates/veyra-backend-swiftui/tests/generate.rs
+expression: f.contents
+---
+// 此文件由Veyra生成，请勿手动修改。
+
+import SwiftUI
+
+struct ScheduleView<ViewModel: ScheduleViewModelContract>: View {
+    let viewModel: ViewModel
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16.0) {
+                Text(L10n.scheduleTitle)
+                    .font(.title)
+                    .padding(8.0)
+                Text(L10n.scheduleCount(count: viewModel.state.count, filter: viewModel.state.subtitle))
+                    .foregroundStyle(.secondary)
+                TextField(L10n.scheduleSearch, text: Binding(get: { viewModel.state.query }, set: { viewModel.setQuery($0) }))
+                SecureField(String("密码"), text: Binding(get: { viewModel.state.password }, set: { viewModel.setPassword($0) }))
+                Toggle(L10n.scheduleNotify, isOn: Binding(get: { viewModel.state.notify }, set: { viewModel.setNotify($0) }))
+                Slider(value: Binding(get: { viewModel.state.volume }, set: { viewModel.setVolume($0) }), in: 0.0...1.0)
+                Button(L10n.scheduleRefresh) {
+                    Task { await viewModel.refresh() }
+                }
+                .disabled(!viewModel.state.canRefresh)
+                .frame(maxWidth: .infinity)
+                if viewModel.state.isRefreshing {
+                    ProgressView()
+                } else if viewModel.state.items.isEmpty {
+                    Text(L10n.scheduleEmpty)
+                } else {
+                    ForEach(viewModel.state.items, id: \.id) { course in
+                        HStack(alignment: .center) {
+                            Image("book")
+                            Text(course.name)
+                                .font(.headline)
+                            Spacer()
+                            Text(course.teacher ?? "-")
+                                .foregroundStyle(Color.gray)
+                        }
+                        .padding()
+                        .background(Color.accentColor)
+                        .onTapGesture { viewModel.openCourse(id: course.id) }
+                        .accessibilityLabel(course.name)
+                    }
+                }
+                Divider()
+                ZStack(alignment: .bottomTrailing) {
+                    Text(verbatim: "v1.0")
+                        .opacity(viewModel.state.isRefreshing ? 0 : 1)
+                }
+            }
+        }
+    }
+}

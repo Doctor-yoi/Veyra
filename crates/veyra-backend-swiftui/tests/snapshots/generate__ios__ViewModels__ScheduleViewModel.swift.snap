@@ -1,0 +1,26 @@
+---
+source: crates/veyra-backend-swiftui/tests/generate.rs
+expression: f.contents
+---
+// 此文件由Veyra创建，之后不会再被覆盖。
+
+import Foundation
+
+@MainActor
+final class ScheduleViewModel: ScheduleViewModelContract {
+    let state = ScheduleState()
+
+    private let courses: any CourseRepository
+
+    init(courses: any CourseRepository) {
+        self.courses = courses
+    }
+
+    func refresh() async {
+        // 在此实现业务逻辑
+    }
+
+    func openCourse(id: String) {
+        // 在此实现业务逻辑
+    }
+}

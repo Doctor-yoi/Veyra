@@ -1,0 +1,15 @@
+---
+source: crates/veyra-backend-swiftui/tests/generate.rs
+expression: f.contents
+---
+// 此文件由Veyra生成，请勿手动修改。
+
+import SwiftUI
+
+struct AboutView<ViewModel: AboutViewModelContract>: View {
+    let viewModel: ViewModel
+
+    var body: some View {
+        Text(verbatim: "Veyra")
+    }
+}

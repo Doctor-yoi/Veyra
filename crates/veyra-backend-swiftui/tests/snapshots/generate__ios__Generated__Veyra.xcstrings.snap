@@ -1,0 +1,112 @@
+---
+source: crates/veyra-backend-swiftui/tests/generate.rs
+expression: f.contents
+---
+{
+  "sourceLanguage": "zh-Hans",
+  "strings": {
+    "schedule.count": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "共%1$lld门课程，筛选：%2$@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$@: %1$lld courses"
+          }
+        }
+      }
+    },
+    "schedule.empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂无课程"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "暂无课程"
+          }
+        }
+      }
+    },
+    "schedule.notify": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上课提醒"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "上课提醒"
+          }
+        }
+      }
+    },
+    "schedule.refresh": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刷新"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "刷新"
+          }
+        }
+      }
+    },
+    "schedule.search": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索课程"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "搜索课程"
+          }
+        }
+      }
+    },
+    "schedule.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "我的课表"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "My Schedule"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
