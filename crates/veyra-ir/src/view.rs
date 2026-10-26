@@ -100,6 +100,51 @@ pub enum ExprKind {
         key: String,
         args: Vec<(String, Expr)>,
     },
+    /// 复数文案，`count`同时作为`{count}`占位符
+    Plural {
+        key: String,
+        count: Box<Expr>,
+    },
+    /// 按用户区域设置格式化为String
+    Format {
+        value: Box<Expr>,
+        style: FormatStyle,
+    },
+}
+
+/// 日期与时间的详略程度
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DateLength {
+    Short,
+    Medium,
+    Long,
+    Full,
+}
+
+impl DateLength {
+    pub const NAMES: [&str; 4] = ["short", "medium", "long", "full"];
+
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "short" => Some(Self::Short),
+            "medium" => Some(Self::Medium),
+            "long" => Some(Self::Long),
+            "full" => Some(Self::Full),
+            _ => None,
+        }
+    }
+}
+
+/// `format()`的样式
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FormatStyle {
+    Number,
+    Percent,
+    /// ISO 4217货币代码
+    Currency(String),
+    Date(DateLength),
+    Time(DateLength),
+    DateTime(DateLength),
 }
 
 /// 命令分发
@@ -342,4 +387,63 @@ pub enum ViewNode {
         then: Vec<ViewNode>,
         else_: Vec<ViewNode>,
     },
+}
+
+impl Expr {
+    /// 先序遍历表达式树
+    pub fn walk(&self, f: &mut dyn FnMut(&Expr)) {
+        f(self);
+        match &self.kind {
+            ExprKind::List(items) => items.iter().for_each(|i| i.walk(f)),
+            ExprKind::Field(b, _)
+            | ExprKind::Count(b)
+            | ExprKind::IsEmpty(b)
+            | ExprKind::First(b)
+            | ExprKind::Unary(_, b) => b.walk(f),
+            ExprKind::Contains(a, b) | ExprKind::Binary(_, a, b) => {
+                a.walk(f);
+                b.walk(f);
+            }
+            ExprKind::Conditional(c, a, b) => {
+                c.walk(f);
+                a.walk(f);
+                b.walk(f);
+            }
+            ExprKind::Loc { args, .. } => args.iter().for_each(|(_, v)| v.walk(f)),
+            ExprKind::Plural { count, .. } => count.walk(f),
+            ExprKind::Format { value, .. } => value.walk(f),
+            _ => {}
+        }
+    }
+}
+
+impl Value {
+    pub fn walk(&self, f: &mut dyn FnMut(&Expr)) {
+        match self {
+            Value::Expr(e) => e.walk(f),
+            Value::Action(ActionRef::Dispatch { args, .. }) => {
+                args.iter().for_each(|(_, v)| v.walk(f))
+            }
+            _ => {}
+        }
+    }
+}
+
+impl ViewNode {
+    /// 遍历视图树中的全部表达式
+    pub fn walk_exprs(&self, f: &mut dyn FnMut(&Expr)) {
+        match self {
+            ViewNode::Element(el) => {
+                el.args.values().for_each(|v| v.walk(f));
+                for m in &el.modifiers {
+                    m.args.values().for_each(|v| v.walk(f));
+                }
+                el.children.iter().for_each(|c| c.walk_exprs(f));
+            }
+            ViewNode::If { cond, then, else_ } => {
+                cond.walk(f);
+                then.iter().chain(else_).for_each(|c| c.walk_exprs(f));
+            }
+        }
+    }
 }

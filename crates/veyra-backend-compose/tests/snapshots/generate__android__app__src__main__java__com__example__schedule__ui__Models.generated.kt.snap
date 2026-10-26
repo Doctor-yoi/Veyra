@@ -6,6 +6,8 @@ expression: f.contents
 
 package com.example.schedule.ui
 
+import java.time.Instant
+
 enum class CourseKind { lecture, lab }
 
 data class Course(
@@ -14,4 +16,5 @@ data class Course(
     val credits: Double,
     val kind: CourseKind,
     val teacher: String?,
+    val startsAt: Instant,
 )

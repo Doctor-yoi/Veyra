@@ -2,7 +2,7 @@
 # Each comment above a key shows the source text
 
 # 共{count}门课程
-"schedule.count" = "全{count}科目"
+"schedule.count" = { other = "全{count}科目" }
 
 # 我的课表
 "schedule.title" = "時間割"

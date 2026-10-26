@@ -26,6 +26,12 @@ fn generates_schedule() {
             if s.key == "schedule.title" {
                 translations.insert("en".to_string(), Translation::Text("My Schedule".into()));
             }
+            if s.key == "schedule.items" {
+                let mut forms = indexmap::IndexMap::new();
+                forms.insert("one".to_string(), "{count} course".to_string());
+                forms.insert("other".to_string(), "{count} courses".to_string());
+                translations.insert("en".to_string(), Translation::Plural(forms));
+            }
             if s.key == "schedule.count" {
                 translations.insert(
                     "en".to_string(),

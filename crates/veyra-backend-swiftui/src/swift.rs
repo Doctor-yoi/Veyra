@@ -4,7 +4,7 @@
 //! Swift类型、字面量与表达式的映射
 
 use veyra_codegen::{camel_case, escape_ident};
-use veyra_ir::{BinaryOp, Expr, ExprKind, Type, UnaryOp};
+use veyra_ir::{BinaryOp, DateLength, Expr, ExprKind, FormatStyle, Type, UnaryOp};
 
 const KEYWORDS: &[&str] = &[
     "Any",
@@ -210,6 +210,16 @@ fn emit(cx: ExprCx, e: &Expr) -> (String, u8) {
             ),
             0,
         ),
+        ExprKind::Plural { key, count } => atom(format!(
+            "L10n.{}(count: {})",
+            l10n_name(key),
+            expr(cx, count)
+        )),
+        ExprKind::Format { value, style } => atom(format!(
+            "{}.formatted({})",
+            wrap(cx, value, ATOM),
+            format_style(style)
+        )),
         ExprKind::Loc { key, args } => {
             if args.is_empty() {
                 atom(format!("L10n.{}", l10n_name(key)))
@@ -221,6 +231,28 @@ fn emit(cx: ExprCx, e: &Expr) -> (String, u8) {
                 atom(format!("L10n.{}({})", l10n_name(key), a.join(", ")))
             }
         }
+    }
+}
+
+fn format_style(style: &FormatStyle) -> String {
+    let date = |l: DateLength| match l {
+        DateLength::Short => ".numeric",
+        DateLength::Medium => ".abbreviated",
+        DateLength::Long => ".long",
+        DateLength::Full => ".complete",
+    };
+    let time = |l: DateLength| match l {
+        DateLength::Short => ".shortened",
+        DateLength::Medium => ".standard",
+        DateLength::Long | DateLength::Full => ".complete",
+    };
+    match style {
+        FormatStyle::Number => ".number".into(),
+        FormatStyle::Percent => ".percent".into(),
+        FormatStyle::Currency(code) => format!(".currency(code: {})", string_literal(code)),
+        FormatStyle::Date(l) => format!("date: {}, time: .omitted", date(*l)),
+        FormatStyle::Time(l) => format!("date: .omitted, time: {}", time(*l)),
+        FormatStyle::DateTime(l) => format!("date: {}, time: {}", date(*l), time(*l)),
     }
 }
 

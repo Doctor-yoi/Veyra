@@ -90,6 +90,14 @@ state {
 
 本地化文案通过`loc(key, 源文案, 参数...)`显式声明。翻译存放在`locales/<locale>.toml`中，由`veyra build`自动同步：新增的key写入空占位，已有翻译原样保留，翻译中的占位符与源文案逐一核对。普通字符串字面量原样输出，不参与本地化。
 
+```
+Text(plural("cart.items", count, other: "共{count}件"))
+Text(format(price, .currency("CNY")))
+Text(format(startsAt, .dateTime(.short)))
+```
+
+`plural`生成String Catalog的复数变体与Android的`<plurals>`资源，各语言的翻译按需提供对应的复数类别。`format`支持`.number`、`.percent`、`.currency(code)`、`.date`、`.time`与`.dateTime`，通过平台格式化器跟随用户的区域设置。
+
 ## 生成的代码
 
 | | SwiftUI（iOS 17+） | Jetpack Compose |

@@ -138,6 +138,12 @@ impl Backend for ComposeBackend {
                 dependencies(program, &options),
             ));
         }
+        if program.any_expr(|e| matches!(e.kind, veyra_ir::ExprKind::Format { .. })) {
+            files.push(OutputFile::generated(
+                file("VeyraFormat"),
+                format_helpers(&options),
+            ));
+        }
         files.extend(resources::strings(input.catalog, &options.res)?);
 
         for s in &program.screens {
@@ -281,4 +287,36 @@ fn dependencies(program: &Program, options: &Options) -> String {
         },
     );
     generated(&options.package, &im, &w.finish())
+}
+
+/// `format()`使用的格式化函数，跟随系统区域设置
+fn format_helpers(options: &Options) -> String {
+    let mut im = Imports::new(options.r_package());
+    for i in [
+        "java.text.NumberFormat",
+        "java.time.Instant",
+        "java.time.ZoneId",
+        "java.time.format.DateTimeFormatter",
+        "java.time.format.FormatStyle",
+        "java.util.Currency",
+    ] {
+        im.add(i);
+    }
+    let body = r#"internal fun veyraFormatNumber(value: Number): String = NumberFormat.getInstance().format(value)
+
+internal fun veyraFormatPercent(value: Double): String = NumberFormat.getPercentInstance().format(value)
+
+internal fun veyraFormatCurrency(value: Number, code: String): String =
+    NumberFormat.getCurrencyInstance().apply { currency = Currency.getInstance(code) }.format(value)
+
+internal fun veyraFormatDate(value: Instant, date: FormatStyle? = null, time: FormatStyle? = null): String {
+    val formatter = when {
+        date != null && time != null -> DateTimeFormatter.ofLocalizedDateTime(date, time)
+        date != null -> DateTimeFormatter.ofLocalizedDate(date)
+        else -> DateTimeFormatter.ofLocalizedTime(time ?: FormatStyle.SHORT)
+    }
+    return formatter.withZone(ZoneId.systemDefault()).format(value)
+}
+"#;
+    generated(&options.package, &im, body)
 }
