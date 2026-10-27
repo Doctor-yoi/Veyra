@@ -27,8 +27,8 @@ use std::collections::{HashMap, HashSet};
 
 use veyra_diagnostics::{Diagnostic, Diagnostics, FileId, Span};
 use veyra_ir::{
-    ComponentParam, EntityDef, EnumDef, LocString, ModelDef, Platform, Program, RepositoryDef,
-    SecureDef, SettingsDef, StoreDef,
+    AppleOs, ComponentParam, EntityDef, EnumDef, LocString, ModelDef, NativeCond, Platform,
+    Program, RepositoryDef, SecureDef, SettingsDef, StoreDef,
 };
 use veyra_syntax::ast;
 
@@ -50,6 +50,10 @@ pub struct Target {
     /// veyra.toml中声明的自定义flag及取值
     pub flags: IndexMap<String, bool>,
     pub native: NativeLint,
+    /// SwiftUI后端启用的Apple系统
+    pub apple_oses: Vec<AppleOs>,
+    /// 按单个系统检查时的系统，None表示把系统差异保留为原生条件
+    pub os: Option<AppleOs>,
 }
 
 impl Target {
@@ -58,6 +62,8 @@ impl Target {
             platform,
             flags: IndexMap::new(),
             native: NativeLint::Warn,
+            apple_oses: vec![AppleOs::Ios],
+            os: None,
         }
     }
 }
@@ -118,6 +124,8 @@ pub(crate) struct Checker<'a> {
     pub paths: HashMap<FileId, String>,
     /// 实际用到的import，键为(导入方, 被导入方)
     pub used_imports: HashSet<(FileId, FileId)>,
+    /// 只在部分Apple系统上存在的screen与component
+    pub item_conds: HashMap<String, NativeCond>,
 }
 
 impl<'a> Checker<'a> {
@@ -140,6 +148,7 @@ impl<'a> Checker<'a> {
             visible: HashMap::new(),
             paths: HashMap::new(),
             used_imports: HashSet::new(),
+            item_conds: HashMap::new(),
         }
     }
 
@@ -154,12 +163,24 @@ impl<'a> Checker<'a> {
             .push(Diagnostic::error(code, message).with_label(span, label));
     }
 
-    /// 声明层级不允许保留`debug`条件
+    /// 声明层级不允许保留原生条件
     pub fn prune_decls<T>(&mut self, nodes: &'a [ast::Node<T>]) -> Vec<&'a T> {
+        self.prune_members(nodes, false)
+            .into_iter()
+            .map(|(item, _)| item)
+            .collect()
+    }
+
+    /// 裁剪声明，`allow_os`为真时允许按Apple系统区分，返回各声明的原生条件
+    pub fn prune_members<T>(
+        &mut self,
+        nodes: &'a [ast::Node<T>],
+        allow_os: bool,
+    ) -> Vec<(&'a T, Option<NativeCond>)> {
         let pruned = self.cfg.prune(nodes, &mut self.diags);
         let mut out = Vec::new();
         for p in pruned {
-            if p.debug.is_some() {
+            if p.depends_on_debug() {
                 self.diags.push(
                     Diagnostic::error("V6002", "`debug`条件只能用于view与修饰符")
                         .with_label(p.cond_span, "")
@@ -167,7 +188,15 @@ impl<'a> Checker<'a> {
                 );
                 continue;
             }
-            out.push(p.item);
+            if p.depends_on_os() && !allow_os {
+                self.diags.push(
+                    Diagnostic::error("V6005", "此处的声明不能按Apple系统区分")
+                        .with_label(p.cond_span, "")
+                        .with_note("按系统区分只支持screen、component、screen中的成员、view与修饰符；可以改用apple、android条件"),
+                );
+                continue;
+            }
+            out.push((p.item, p.cond));
         }
         out
     }
@@ -184,7 +213,22 @@ impl<'a> Checker<'a> {
             self.paths.insert(file.id, file.path.clone());
         }
         for file in files {
-            for item in self.prune_decls(&file.items) {
+            for (item, cond) in self.prune_members(&file.items, true) {
+                if cond.is_some() && !matches!(item, ast::Item::Screen(_) | ast::Item::Component(_))
+                {
+                    self.diags.push(
+                        Diagnostic::error(
+                            "V6005",
+                            format!("`{}`声明不能按Apple系统区分", item.keyword()),
+                        )
+                        .with_label(item.name().span, "")
+                        .with_note("只有screen与component可以只在部分Apple系统上存在"),
+                    );
+                    continue;
+                }
+                if let Some(c) = cond {
+                    self.item_conds.insert(item.name().name.clone(), c);
+                }
                 self.register(item);
             }
         }

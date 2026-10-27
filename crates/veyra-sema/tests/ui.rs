@@ -43,7 +43,7 @@ fn ui() {
         .filter(|p| p.extension().is_some_and(|e| e == "vey"))
     {
         let stem = path.file_stem().unwrap().to_string_lossy().to_string();
-        let ios = check(&path, Platform::Ios);
+        let ios = check(&path, Platform::Apple);
         let android = check(&path, Platform::Android);
         let out = if ios == android {
             ios

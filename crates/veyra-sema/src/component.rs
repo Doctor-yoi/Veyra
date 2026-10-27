@@ -82,6 +82,7 @@ impl<'a> Checker<'a> {
                 self.error("V3021", "组件不能为空", d.span, "");
             }
             out.push(ir::ComponentDef {
+                cond: self.item_conds.get(&d.name.name).cloned(),
                 name: d.name.name.clone(),
                 params,
                 body,
@@ -102,7 +103,7 @@ impl<'a> Checker<'a> {
                         }
                         uses(&el.children, out);
                     }
-                    ViewNode::If { then, else_, .. } | ViewNode::Debug { then, else_ } => {
+                    ViewNode::If { then, else_, .. } | ViewNode::Cond { then, else_, .. } => {
                         uses(then, out);
                         uses(else_, out);
                     }

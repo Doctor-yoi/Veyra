@@ -9,7 +9,7 @@
 use veyra_codegen::{CodeWriter, pascal_case};
 use veyra_ir::{
     ActionRef, AndroidElement, AndroidModifier, BindingRef, Builtin, Element, ElementKind, Expr,
-    ExprKind, Modifier, ModifierKind, NativeSegment, UnaryOp, Value, ViewNode,
+    ExprKind, Modifier, ModifierKind, NativeCond, NativeSegment, UnaryOp, Value, ViewNode,
 };
 
 use crate::kotlin::{self, ExprCx, Imports, dp, float, ident};
@@ -87,28 +87,20 @@ impl ViewEmitter<'_> {
                     w.line(format!("if ({c}) {{"));
                     self.if_tail(w, then, else_, parent);
                 }
-                ViewNode::Debug { then, else_ } => {
-                    let flag = self.build_config();
-                    if then.is_empty() {
-                        w.line(format!("if (!{flag}) {{"));
+                ViewNode::Cond { cond, then, else_ } => {
+                    let c = self.native_cond(cond);
+                    w.line(format!("if ({c}) {{"));
+                    w.indent();
+                    self.nodes(w, then, parent);
+                    w.dedent();
+                    if else_.is_empty() {
+                        w.line("}");
+                    } else {
+                        w.line("} else {");
                         w.indent();
                         self.nodes(w, else_, parent);
                         w.dedent();
                         w.line("}");
-                    } else {
-                        w.line(format!("if ({flag}) {{"));
-                        w.indent();
-                        self.nodes(w, then, parent);
-                        w.dedent();
-                        if else_.is_empty() {
-                            w.line("}");
-                        } else {
-                            w.line("} else {");
-                            w.indent();
-                            self.nodes(w, else_, parent);
-                            w.dedent();
-                            w.line("}");
-                        }
                     }
                 }
                 ViewNode::Native(segments) => {
@@ -130,6 +122,15 @@ impl ViewEmitter<'_> {
                 }
             }
         }
+    }
+
+    /// Android上只会出现debug条件，Apple系统条件在裁剪时已为假
+    fn native_cond(&mut self, cond: &NativeCond) -> String {
+        let flag = self.build_config();
+        cond.render(&|c| match c {
+            NativeCond::Debug => flag.clone(),
+            _ => "false".into(),
+        })
     }
 
     /// 应用的BuildConfig.DEBUG
@@ -310,12 +311,11 @@ impl ViewEmitter<'_> {
                 | ModifierKind::Disabled => {}
             }
             // 只在调试或发布构建中生效的修饰符
-            if let Some(debug) = m.debug
+            if let Some(native) = &m.cond
                 && parts.len() > before
             {
                 let added: Vec<String> = parts.drain(before..).collect();
-                let flag = self.build_config();
-                let cond = if debug { flag } else { format!("!{flag}") };
+                let cond = self.native_cond(native);
                 parts.push(format!(
                     "then(if ({cond}) Modifier.{} else Modifier)",
                     added.join(".")

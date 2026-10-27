@@ -3,7 +3,7 @@
 
 use indexmap::IndexMap;
 
-use crate::Type;
+use crate::{NativeCond, Type};
 
 /// 带类型的纯表达式
 #[derive(Clone, Debug, PartialEq)]
@@ -410,8 +410,8 @@ impl ModifierKind {
 pub struct Modifier {
     pub kind: ModifierKind,
     pub args: IndexMap<String, Value>,
-    /// `Some(true)`只在调试构建中生效，`Some(false)`只在发布构建中生效
-    pub debug: Option<bool>,
+    /// 只在部分构建或系统上生效时的原生条件
+    pub cond: Option<NativeCond>,
 }
 
 impl Modifier {
@@ -428,8 +428,9 @@ pub enum ViewNode {
         then: Vec<ViewNode>,
         else_: Vec<ViewNode>,
     },
-    /// 由原生构建配置决定的分支，`then`在调试构建中生效
-    Debug {
+    /// 由原生构建决定的分支，例如`#if DEBUG`或`#if os(iOS)`
+    Cond {
+        cond: NativeCond,
         then: Vec<ViewNode>,
         else_: Vec<ViewNode>,
     },
@@ -504,7 +505,7 @@ impl ViewNode {
                 cond.walk(f);
                 then.iter().chain(else_).for_each(|c| c.walk_exprs(f));
             }
-            ViewNode::Debug { then, else_ } => {
+            ViewNode::Cond { then, else_, .. } => {
                 then.iter().chain(else_).for_each(|c| c.walk_exprs(f))
             }
             ViewNode::Native(segments) => {
@@ -526,7 +527,7 @@ impl ViewNode {
                 f(el);
                 el.children.iter().for_each(|c| c.walk_elements(f));
             }
-            ViewNode::If { then, else_, .. } | ViewNode::Debug { then, else_ } => {
+            ViewNode::If { then, else_, .. } | ViewNode::Cond { then, else_, .. } => {
                 then.iter().chain(else_).for_each(|c| c.walk_elements(f));
             }
             ViewNode::Native(_) => {}

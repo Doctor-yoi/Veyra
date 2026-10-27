@@ -9,6 +9,7 @@ dir = "locales"
 missing = "warn"
 
 [swiftui]
+platforms = ["ios", "macos", "visionos"]
 out = "ios/Generated"
 user_dir = "ios/ViewModels"
 

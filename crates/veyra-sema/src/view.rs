@@ -19,7 +19,7 @@ impl<'a> Checker<'a> {
         nodes: &'a [ast::Node<ast::ViewNode>],
     ) -> Vec<ir::ViewNode> {
         let pruned = self.cfg.prune(nodes, &mut self.diags);
-        let mut items: Vec<(Option<bool>, ir::ViewNode)> = Vec::new();
+        let mut items: Vec<(Option<ir::NativeCond>, ir::ViewNode)> = Vec::new();
         for p in pruned {
             let node = match p.item {
                 ast::ViewNode::Element(el) => self.element(sc, el).map(ir::ViewNode::Element),
@@ -27,10 +27,10 @@ impl<'a> Checker<'a> {
                 ast::ViewNode::Native(n) => self.native(sc, n),
             };
             if let Some(node) = node {
-                items.push((p.debug, node));
+                items.push((p.cond.clone(), node));
             }
         }
-        group_debug(items)
+        group_conds(items)
     }
 
     fn if_node(&mut self, sc: &mut Scope, node: &'a ast::IfNode) -> ir::ViewNode {
@@ -238,21 +238,40 @@ impl<'a> Checker<'a> {
     }
 
     /// 平台命名空间需与当前目标一致
+    /// 框架命名空间需与当前后端一致：`swiftui.*`用于Apple，`compose.*`用于Android
     fn check_platform(&mut self, ns: &ast::Ident, full: &str, span: Span) -> bool {
-        let Some(platform) = ir::Platform::from_cfg_name(&ns.name) else {
-            self.error(
-                "V1011",
-                format!("未知的平台`{}`", ns.name),
-                ns.span,
-                "可用的平台：ios、android",
-            );
-            return false;
+        let platform = match ns.name.as_str() {
+            "swiftui" => ir::Platform::Apple,
+            "compose" => ir::Platform::Android,
+            old @ ("ios" | "android") => {
+                let new = if old == "ios" { "swiftui" } else { "compose" };
+                self.diags.push(
+                    Diagnostic::error("V6020", format!("`{old}.*`已改名为`{new}.*`"))
+                        .with_label(ns.span, format!("改为`{new}`"))
+                        .with_note("平台专属API按框架命名，系统差异请使用#if ios、#if macos等条件"),
+                );
+                return false;
+            }
+            other => {
+                self.error(
+                    "V1011",
+                    format!("未知的框架`{other}`"),
+                    ns.span,
+                    "可用的框架：swiftui、compose",
+                );
+                return false;
+            }
         };
         if platform != self.target.platform {
+            let cond = if platform == ir::Platform::Apple {
+                "apple"
+            } else {
+                "android"
+            };
             self.diags.push(
                 Diagnostic::error("V6004", format!("`{full}`只能用于{}", ns.name))
                     .with_label(span, "")
-                    .with_note(format!("请放在`#if {}`条件块中", ns.name)),
+                    .with_note(format!("请放在`#if {cond}`条件块中")),
             );
             return false;
         }
@@ -269,7 +288,7 @@ impl<'a> Checker<'a> {
             return None;
         }
         let Some((kind, spec)) = catalog::platform_element(&ns.name, &name.name) else {
-            let all = if ns.name == "ios" {
+            let all = if ns.name == "swiftui" {
                 catalog::IOS_ELEMENTS
             } else {
                 catalog::ANDROID_ELEMENTS
@@ -312,7 +331,7 @@ impl<'a> Checker<'a> {
         }
         let kind = catalog::platform_modifier(&ns.name, &name.name);
         if kind.is_none() {
-            let all = if ns.name == "ios" {
+            let all = if ns.name == "swiftui" {
                 catalog::IOS_MODIFIERS
             } else {
                 catalog::ANDROID_MODIFIERS
@@ -509,7 +528,7 @@ impl<'a> Checker<'a> {
                 name.span,
                 &format!("修饰符`.{}`", name.name),
             );
-            if p.debug.is_some() && catalog::is_parameter_modifier(kind) {
+            if p.depends_on_debug() && catalog::is_parameter_modifier(kind) {
                 self.diags.push(
                     Diagnostic::error("V6003", format!("`.{}`不能放在`debug`条件中", name.name))
                         .with_label(name.span, "")
@@ -520,7 +539,7 @@ impl<'a> Checker<'a> {
             out.push(ir::Modifier {
                 kind,
                 args,
-                debug: p.debug,
+                cond: p.cond.clone(),
             });
         }
         out
@@ -654,36 +673,34 @@ impl<'a> Checker<'a> {
     }
 }
 
-/// 把连续的debug节点合并为`ViewNode::Debug`
-fn group_debug(items: Vec<(Option<bool>, ir::ViewNode)>) -> Vec<ir::ViewNode> {
-    let mut out = Vec::new();
-    let mut then = Vec::new();
-    let mut else_ = Vec::new();
-    let flush = |out: &mut Vec<ir::ViewNode>,
-                 then: &mut Vec<ir::ViewNode>,
-                 else_: &mut Vec<ir::ViewNode>| {
-        if !then.is_empty() || !else_.is_empty() {
-            out.push(ir::ViewNode::Debug {
-                then: std::mem::take(then),
-                else_: std::mem::take(else_),
-            });
-        }
-    };
-    for (debug, node) in items {
-        match debug {
-            None => {
-                flush(&mut out, &mut then, &mut else_);
-                out.push(node);
-            }
-            Some(true) => {
-                if !else_.is_empty() {
-                    flush(&mut out, &mut then, &mut else_);
-                }
+/// 把连续的同条件节点合并为`ViewNode::Cond`，紧随其后的相反条件作为else分支
+fn group_conds(items: Vec<(Option<ir::NativeCond>, ir::ViewNode)>) -> Vec<ir::ViewNode> {
+    let mut out: Vec<ir::ViewNode> = Vec::new();
+    for (cond, node) in items {
+        let Some(cond) = cond else {
+            out.push(node);
+            continue;
+        };
+        if let Some(ir::ViewNode::Cond {
+            cond: prev,
+            then,
+            else_,
+        }) = out.last_mut()
+        {
+            if *prev == cond && else_.is_empty() {
                 then.push(node);
+                continue;
             }
-            Some(false) => else_.push(node),
+            if prev.clone().negate() == cond {
+                else_.push(node);
+                continue;
+            }
         }
+        out.push(ir::ViewNode::Cond {
+            cond,
+            then: vec![node],
+            else_: Vec::new(),
+        });
     }
-    flush(&mut out, &mut then, &mut else_);
     out
 }

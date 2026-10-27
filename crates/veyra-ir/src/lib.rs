@@ -11,10 +11,12 @@
 //!
 //! 后端只需把IR映射为对应平台的惯用写法，不再做语义检查
 
+mod cond;
 mod l10n;
 mod types;
 mod view;
 
+pub use cond::{AppleOs, NativeCond, Worlds};
 pub use l10n::{
     Catalog, CatalogEntry, LocArg, LocArgType, LocString, PLURAL_CATEGORIES, PluralForms, Segment,
     Translation, parse_template,
@@ -25,18 +27,19 @@ pub use view::*;
 /// 目标平台
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Platform {
-    Ios,
+    /// SwiftUI后端，覆盖全部Apple系统
+    Apple,
     Android,
     Harmony,
 }
 
 impl Platform {
-    pub const ALL: [Platform; 3] = [Platform::Ios, Platform::Android, Platform::Harmony];
+    pub const ALL: [Platform; 3] = [Platform::Apple, Platform::Android, Platform::Harmony];
 
     /// 条件编译中使用的名称
     pub fn cfg_name(self) -> &'static str {
         match self {
-            Platform::Ios => "ios",
+            Platform::Apple => "apple",
             Platform::Android => "android",
             Platform::Harmony => "harmony",
         }
@@ -110,7 +113,7 @@ impl Program {
             }
             match n {
                 ViewNode::Element(el) => el.children.iter().any(|c| visit(c, pred)),
-                ViewNode::If { then, else_, .. } | ViewNode::Debug { then, else_ } => {
+                ViewNode::If { then, else_, .. } | ViewNode::Cond { then, else_, .. } => {
                     then.iter().chain(else_).any(|c| visit(c, pred))
                 }
                 ViewNode::Native(_) => false,
@@ -187,6 +190,8 @@ pub enum InjectKind {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct InjectDef {
+    /// 只在部分Apple系统上存在时的原生条件
+    pub cond: Option<NativeCond>,
     pub name: String,
     pub ty: String,
     pub kind: InjectKind,
@@ -194,6 +199,8 @@ pub struct InjectDef {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StateField {
+    /// 只在部分Apple系统上存在时的原生条件
+    pub cond: Option<NativeCond>,
     pub name: String,
     pub ty: Type,
     pub default: Expr,
@@ -217,6 +224,8 @@ pub fn setter_name(field: &str) -> String {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ComputedField {
+    /// 只在部分Apple系统上存在时的原生条件
+    pub cond: Option<NativeCond>,
     pub name: String,
     pub ty: Type,
     pub expr: Expr,
@@ -224,6 +233,8 @@ pub struct ComputedField {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ActionDef {
+    /// 只在部分Apple系统上存在时的原生条件
+    pub cond: Option<NativeCond>,
     pub name: String,
     pub params: Vec<ParamDef>,
     pub is_async: bool,
@@ -232,6 +243,8 @@ pub struct ActionDef {
 /// ViewModel发出的一次性事件，例如导航
 #[derive(Clone, Debug, PartialEq)]
 pub struct EffectDef {
+    /// 只在部分Apple系统上存在时的原生条件
+    pub cond: Option<NativeCond>,
     pub name: String,
     pub params: Vec<ParamDef>,
 }
@@ -262,6 +275,8 @@ pub struct LifecycleHook {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScreenDef {
+    /// 只在部分Apple系统上存在时的原生条件
+    pub cond: Option<NativeCond>,
     pub name: String,
     pub injects: Vec<InjectDef>,
     pub state: Vec<StateField>,
@@ -303,6 +318,8 @@ pub struct ComponentParam {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ComponentDef {
+    /// 只在部分Apple系统上存在时的原生条件
+    pub cond: Option<NativeCond>,
     pub name: String,
     pub params: Vec<ComponentParam>,
     pub body: Vec<ViewNode>,

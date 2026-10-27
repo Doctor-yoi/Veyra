@@ -27,17 +27,12 @@ pub(crate) fn nodes(w: &mut CodeWriter, cx: ViewCx, nodes: &[ViewNode]) {
                 w.line(format!("if {} {{", swift::expr(cx.expr, cond)));
                 if_tail(w, cx, then, else_);
             }
-            ViewNode::Debug { then, else_ } => {
-                if then.is_empty() {
-                    w.line("#if !DEBUG");
+            ViewNode::Cond { cond, then, else_ } => {
+                w.line(format!("#if {}", cond.swift()));
+                self::nodes(w, cx, then);
+                if !else_.is_empty() {
+                    w.line("#else");
                     self::nodes(w, cx, else_);
-                } else {
-                    w.line("#if DEBUG");
-                    self::nodes(w, cx, then);
-                    if !else_.is_empty() {
-                        w.line("#else");
-                        self::nodes(w, cx, else_);
-                    }
                 }
                 w.line("#endif");
             }
@@ -327,15 +322,13 @@ fn trailing_modifiers(w: &mut CodeWriter, cx: ViewCx, mods: &[Modifier]) {
             continue;
         }
         // 后缀表达式中的#if，需要Swift 5.5及以上
-        match m.debug {
-            Some(true) => w.line("#if DEBUG"),
-            Some(false) => w.line("#if !DEBUG"),
-            None => {}
+        if let Some(cond) = &m.cond {
+            w.line(format!("#if {}", cond.swift()));
         }
         for line in lines {
             w.line(line);
         }
-        if m.debug.is_some() {
+        if m.cond.is_some() {
             w.line("#endif");
         }
     }

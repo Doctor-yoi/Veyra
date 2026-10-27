@@ -8,6 +8,7 @@ use veyra_diagnostics::{Diagnostic, Span};
 use veyra_ir::{self as ir, ExprKind, InjectDef, InjectKind};
 use veyra_syntax::ast::{self, ScreenMember};
 
+use crate::cfg::and_cond;
 use crate::decls::TypePos;
 use crate::expr::{ActionInfo, Owner, Scope, ScreenInfo, StateInfo};
 use crate::{Checker, Global};
@@ -27,7 +28,7 @@ impl<'a> Checker<'a> {
 
     fn check_screen(&mut self, d: &'a ast::ScreenDecl) -> ir::ScreenDef {
         self.current = d.span.file;
-        let members = self.prune_decls(&d.members);
+        let members = self.prune_members(&d.members, true);
         let mut info = ScreenInfo::default();
         let mut names: IndexMap<String, Span> = IndexMap::new();
         let mut injects = Vec::new();
@@ -53,8 +54,16 @@ impl<'a> Checker<'a> {
         };
 
         // 先收集签名，view与computed可以引用之后声明的成员
-        for m in &members {
+        for (m, mcond) in &members {
+            let mcond = mcond.clone();
             match m {
+                ScreenMember::Inject(inj) if mcond.is_some() => {
+                    self.diags.push(
+                        Diagnostic::error("V6005", "inject不能按Apple系统区分")
+                            .with_label(inj.span, "")
+                            .with_note("依赖通过构造器注入，在所有系统上都必须存在；可以只在部分系统上使用它"),
+                    );
+                }
                 ScreenMember::Inject(inj) => {
                     if !claim(self, &inj.name) {
                         continue;
@@ -63,6 +72,7 @@ impl<'a> Checker<'a> {
                         Some(Global::Repository(_)) => {
                             info.injects.insert(inj.name.name.clone());
                             injects.push(InjectDef {
+                                cond: None,
                                 name: inj.name.name.clone(),
                                 ty: inj.ty.name.clone(),
                                 kind: InjectKind::Repository,
@@ -71,6 +81,7 @@ impl<'a> Checker<'a> {
                         Some(Global::Store(_)) => {
                             info.injects.insert(inj.name.name.clone());
                             injects.push(InjectDef {
+                                cond: None,
                                 name: inj.name.name.clone(),
                                 ty: inj.ty.name.clone(),
                                 kind: InjectKind::Store,
@@ -79,6 +90,7 @@ impl<'a> Checker<'a> {
                         Some(Global::Settings(_)) => {
                             info.injects.insert(inj.name.name.clone());
                             injects.push(InjectDef {
+                                cond: None,
                                 name: inj.name.name.clone(),
                                 ty: inj.ty.name.clone(),
                                 kind: InjectKind::Settings,
@@ -87,6 +99,7 @@ impl<'a> Checker<'a> {
                         Some(Global::Secure(_)) => {
                             info.injects.insert(inj.name.name.clone());
                             injects.push(InjectDef {
+                                cond: None,
                                 name: inj.name.name.clone(),
                                 ty: inj.ty.name.clone(),
                                 kind: InjectKind::Secure,
@@ -108,7 +121,8 @@ impl<'a> Checker<'a> {
                     }
                 }
                 ScreenMember::State(block) => {
-                    for f in self.prune_decls(&block.items) {
+                    for (f, c) in self.prune_members(&block.items, true) {
+                        let cond = and_cond(mcond.clone(), c);
                         if !claim(self, &f.name) {
                             continue;
                         }
@@ -133,11 +147,12 @@ impl<'a> Checker<'a> {
                                 span: f.name.span,
                             },
                         );
-                        state.push((f, ty, writable));
+                        state.push((f, ty, writable, cond));
                     }
                 }
                 ScreenMember::Computed(block) => {
-                    for f in self.prune_decls(&block.items) {
+                    for (f, c) in self.prune_members(&block.items, true) {
+                        let cond = and_cond(mcond.clone(), c);
                         if !claim(self, &f.name) {
                             continue;
                         }
@@ -151,11 +166,12 @@ impl<'a> Checker<'a> {
                         }
                         let ty = self.resolve_type(&f.ty, TypePos::Value);
                         info.computed.insert(f.name.name.clone(), ty.clone());
-                        computed_src.push((f, ty));
+                        computed_src.push((f, ty, cond));
                     }
                 }
                 ScreenMember::Actions(block) => {
-                    for a in self.prune_decls(&block.items) {
+                    for (a, c) in self.prune_members(&block.items, true) {
+                        let cond = and_cond(mcond.clone(), c);
                         if !claim(self, &a.name) {
                             continue;
                         }
@@ -183,6 +199,7 @@ impl<'a> Checker<'a> {
                             },
                         );
                         actions.push(ir::ActionDef {
+                            cond,
                             name: a.name.name.clone(),
                             params,
                             is_async: a.is_async,
@@ -190,7 +207,8 @@ impl<'a> Checker<'a> {
                     }
                 }
                 ScreenMember::Effects(block) => {
-                    for e in self.prune_decls(&block.items) {
+                    for (e, c) in self.prune_members(&block.items, true) {
+                        let cond = and_cond(mcond.clone(), c);
                         if !claim(self, &e.name) {
                             continue;
                         }
@@ -204,13 +222,32 @@ impl<'a> Checker<'a> {
                         info.effects.insert(e.name.name.clone());
                         let params = self.params(&e.params);
                         effects.push(ir::EffectDef {
+                            cond,
                             name: e.name.name.clone(),
                             params,
                         });
                     }
                 }
-                ScreenMember::Lifecycle(block) => hooks.extend(self.prune_decls(&block.items)),
-                ScreenMember::View(block) => views.push(block),
+                ScreenMember::Lifecycle(block) => {
+                    if mcond.is_some() {
+                        self.diags.push(
+                            Diagnostic::error("V6005", "lifecycle块不能按Apple系统区分")
+                                .with_label(block.keyword, "")
+                                .with_note("请在action的实现中按系统处理"),
+                        );
+                    }
+                    hooks.extend(self.prune_decls(&block.items))
+                }
+                ScreenMember::View(block) => {
+                    if mcond.is_some() {
+                        self.diags.push(
+                            Diagnostic::error("V6005", "view块不能按Apple系统区分")
+                                .with_label(block.keyword, "")
+                                .with_note("请在view内部使用#if"),
+                        );
+                    }
+                    views.push(block)
+                }
             }
         }
 
@@ -233,7 +270,7 @@ impl<'a> Checker<'a> {
 
         let state = state
             .into_iter()
-            .map(|(f, ty, writable)| {
+            .map(|(f, ty, writable, cond)| {
                 let default = match &f.default {
                     Some(e) => self.expr(&Scope::new(Owner::Constant, false), e, Some(&ty)),
                     None if ty.is_optional() => ir::Expr::new(ExprKind::Nil, ty.clone()),
@@ -250,6 +287,7 @@ impl<'a> Checker<'a> {
                     }
                 };
                 ir::StateField {
+                    cond,
                     name: f.name.name.clone(),
                     ty,
                     default,
@@ -260,7 +298,7 @@ impl<'a> Checker<'a> {
 
         let computed: Vec<ir::ComputedField> = computed_src
             .into_iter()
-            .map(|(f, ty)| {
+            .map(|(f, ty, cond)| {
                 let sc = Scope::new(Owner::Screen(&info), false);
                 let expr = match &f.default {
                     Some(e) => self.expr(&sc, e, Some(&ty)),
@@ -275,6 +313,7 @@ impl<'a> Checker<'a> {
                     }
                 };
                 ir::ComputedField {
+                    cond,
                     name: f.name.name.clone(),
                     ty,
                     expr,
@@ -329,6 +368,7 @@ impl<'a> Checker<'a> {
         }
 
         ir::ScreenDef {
+            cond: self.item_conds.get(&d.name.name).cloned(),
             name: d.name.name.clone(),
             injects,
             state,

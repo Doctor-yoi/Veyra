@@ -8,18 +8,19 @@ screen Home {
   }
   view {
     Column {
-      ios.ShareLink("分享", item: title)
-      #if ios
-      ios.Unknown()
-      Text("x").ios.blur()
+      swiftui.ShareLink("分享", item: title)
+      #if apple
+      swiftui.Unknown()
+      Text("x").swiftui.blur()
+      ios.ShareLink("旧写法", item: title)
       #endif
       windows.Button()
       Text("x")
         #if debug
         .font(.title)
         #endif
-      #if ios
-      native ios {
+      #if apple
+      native swiftui {
         """
         Text({{missing}}) {{go}} {{title.count}} {{a b}}
         """
@@ -28,3 +29,20 @@ screen Home {
     }
   }
 }
+
+screen Settings {
+  #if ios
+  inject repo: Repo
+  #endif
+  view {
+    Text("x")
+  }
+}
+
+repository Repo {
+  load() async
+}
+
+#if macos
+model MacOnly { a: Int }
+#endif

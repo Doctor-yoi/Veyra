@@ -73,17 +73,17 @@ screen Schedule {
         TextField(loc("schedule.search", "搜索课程"), text: bind(query))
         SearchBar(text: bind(query), placeholder: "搜索")
         #if ios
-        ios.ShareLink(loc("schedule.share", "分享"), item: query)
-        native ios {
+        swiftui.ShareLink(loc("schedule.share", "分享"), item: query)
+        native swiftui {
           """
           Text(verbatim: {{query}}).monospaced()
           Button("Native") { Task { await {{refresh}}() } }
           """
         }
         #elseif android
-        android.FloatingActionButton("+", action: refresh)
-          .android.testTag("fab")
-        native android {
+        compose.FloatingActionButton("+", action: refresh)
+          .compose.testTag("fab")
+        native compose {
           """
           Text(text = {{query}})
           """
@@ -96,7 +96,7 @@ screen Schedule {
         #endif
         Text("tag")
           #if ios
-          .ios.glassEffect()
+          .swiftui.glassEffect()
           #endif
           #if debug
           .padding(4)
