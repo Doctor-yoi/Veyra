@@ -470,6 +470,8 @@ pub enum ExprKind {
     Ternary(Box<Expr>, Box<Expr>, Box<Expr>),
     List(Vec<Expr>),
     Paren(Box<Expr>),
+    /// 作为参数的视图闭包，例如`label: { Text("x") }`
+    Closure(Closure),
     /// 解析失败时的占位
     Error,
 }
