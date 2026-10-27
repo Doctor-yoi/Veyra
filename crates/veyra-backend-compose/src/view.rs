@@ -437,6 +437,31 @@ impl ViewEmitter<'_> {
             .iter()
             .any(|m| matches!(m.kind, ModifierKind::Refreshable | ModifierKind::Searchable))
         {
+            // 带条件的包裹修饰符拆成两个分支，条件不成立时输出不带该修饰符的组件
+            let wrapper = |m: &Modifier| {
+                matches!(m.kind, ModifierKind::Refreshable | ModifierKind::Searchable)
+            };
+            if let Some(i) = el
+                .modifiers
+                .iter()
+                .position(|m| wrapper(m) && m.cond.is_some())
+            {
+                let mut with = el.clone();
+                let cond = with.modifiers[i].cond.take();
+                let mut without = el.clone();
+                without.modifiers.remove(i);
+                let c = cond.map(|c| self.native_cond(&c)).unwrap_or_default();
+                w.line(format!("if ({c}) {{"));
+                w.indent();
+                self.element(w, &with, parent, Some(base));
+                w.dedent();
+                w.line("} else {");
+                w.indent();
+                self.element(w, &without, parent, Some(base));
+                w.dedent();
+                w.line("}");
+                return;
+            }
             let mut inner = el.clone();
             inner.modifiers.retain(|m| {
                 !matches!(m.kind, ModifierKind::Refreshable | ModifierKind::Searchable)

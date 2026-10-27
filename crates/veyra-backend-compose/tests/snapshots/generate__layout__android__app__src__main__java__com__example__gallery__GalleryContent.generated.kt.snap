@@ -74,9 +74,19 @@ fun GalleryContent(
                 Text(text = photo.title)
             }
         }
-        LazyColumn {
-            items(items = state.photos, key = { it.id }) { photo ->
-                Text(text = photo.title)
+        if (BuildConfig.DEBUG) {
+            PullToRefreshBox(isRefreshing = false, onRefresh = { actions.reload() }, modifier = Modifier) {
+                LazyColumn {
+                    items(items = state.photos, key = { it.id }) { photo ->
+                        Text(text = photo.title)
+                    }
+                }
+            }
+        } else {
+            LazyColumn {
+                items(items = state.photos, key = { it.id }) { photo ->
+                    Text(text = photo.title)
+                }
             }
         }
         Row(
