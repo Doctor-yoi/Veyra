@@ -302,34 +302,64 @@ pub enum ElementKind {
     Builtin(Builtin),
     /// 用户声明的component
     Component(String),
-    /// 只能出现在`#if ios`中的组件
-    Ios(IosElement),
+    /// SwiftUI目录中的组件，只能出现在`#if apple`中
+    SwiftUi(FrameworkCall),
     /// 只能出现在`#if android`中的组件
     Android(AndroidElement),
 }
 
-/// iOS专属组件
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum IosElement {
-    /// 系统分享按钮
-    ShareLink,
+/// 对框架API的类型化调用，参数按Swift签名的顺序排列
+#[derive(Clone, Debug, PartialEq)]
+pub struct FrameworkCall {
+    pub name: String,
+    pub args: Vec<FrameworkArg>,
+    /// 签名中最后一个参数是否为视图内容，用于生成尾随闭包
+    pub trailing_content: bool,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FrameworkArg {
+    /// Swift中的参数标签，None表示`_`
+    pub label: Option<String>,
+    pub value: FrameworkValue,
+}
+
+/// 生成Swift时对表达式的转换
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SwiftConv {
+    None,
+    /// `S: StringProtocol`
+    String,
+    /// `Text`
+    Text,
+    LocalizedKey,
+    Float,
+    Url,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum FrameworkValue {
+    Expr(Expr, SwiftConv),
+    Action {
+        action: ActionRef,
+        is_async: bool,
+    },
+    Binding(BindingRef),
+    /// `.member`或`.member(args)`
+    Token {
+        member: String,
+        args: Option<Vec<FrameworkArg>>,
+    },
+    /// 视图内容闭包
+    Content(Vec<ViewNode>),
+    /// 视图本身作为参数
+    View(Vec<ViewNode>),
 }
 
 /// Android专属组件
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum AndroidElement {
     FloatingActionButton,
-}
-
-/// iOS专属修饰符
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum IosModifier {
-    /// iOS 26起的Liquid Glass效果，旧系统忽略
-    GlassEffect,
-    NavigationTitle,
-    TextInputAutocapitalization,
-    ListStyle,
-    ScrollDismissesKeyboard,
 }
 
 /// Android专属修饰符
@@ -360,7 +390,8 @@ impl Element {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ModifierKind {
-    Ios(IosModifier),
+    /// SwiftUI目录中的修饰符，调用信息位于[`Modifier::call`]
+    SwiftUi,
     Android(AndroidModifier),
     Padding,
     Font,
@@ -397,7 +428,7 @@ impl ModifierKind {
             ModifierKind::Hidden => "hidden",
             ModifierKind::OnTap => "onTap",
             ModifierKind::AccessibilityLabel => "accessibilityLabel",
-            ModifierKind::Ios(_) | ModifierKind::Android(_) => "platform",
+            ModifierKind::SwiftUi | ModifierKind::Android(_) => "platform",
         }
     }
 
@@ -412,6 +443,8 @@ pub struct Modifier {
     pub args: IndexMap<String, Value>,
     /// 只在部分构建或系统上生效时的原生条件
     pub cond: Option<NativeCond>,
+    /// SwiftUI目录修饰符的调用
+    pub call: Option<FrameworkCall>,
 }
 
 impl Modifier {
@@ -436,6 +469,12 @@ pub enum ViewNode {
     },
     /// 原样输出的平台代码
     Native(Vec<NativeSegment>),
+    /// `if available(ios: 26) { } else { }`，生成`if #available`
+    Available {
+        versions: Vec<(crate::AppleOs, String)>,
+        then: Vec<ViewNode>,
+        else_: Vec<ViewNode>,
+    },
 }
 
 /// native代码块中的片段
@@ -496,8 +535,14 @@ impl ViewNode {
         match self {
             ViewNode::Element(el) => {
                 el.args.values().for_each(|v| v.walk(f));
+                if let ElementKind::SwiftUi(call) = &el.kind {
+                    call.walk_exprs(f);
+                }
                 for m in &el.modifiers {
                     m.args.values().for_each(|v| v.walk(f));
+                    if let Some(call) = &m.call {
+                        call.walk_exprs(f);
+                    }
                 }
                 el.children.iter().for_each(|c| c.walk_exprs(f));
             }
@@ -505,7 +550,7 @@ impl ViewNode {
                 cond.walk(f);
                 then.iter().chain(else_).for_each(|c| c.walk_exprs(f));
             }
-            ViewNode::Cond { then, else_, .. } => {
+            ViewNode::Cond { then, else_, .. } | ViewNode::Available { then, else_, .. } => {
                 then.iter().chain(else_).for_each(|c| c.walk_exprs(f))
             }
             ViewNode::Native(segments) => {
@@ -519,6 +564,41 @@ impl ViewNode {
     }
 }
 
+impl FrameworkCall {
+    pub fn walk_exprs(&self, f: &mut dyn FnMut(&Expr)) {
+        for a in &self.args {
+            a.value.walk_exprs(f);
+        }
+    }
+}
+
+impl FrameworkValue {
+    pub fn walk_exprs(&self, f: &mut dyn FnMut(&Expr)) {
+        match self {
+            FrameworkValue::Expr(e, _) => e.walk(f),
+            FrameworkValue::Action {
+                action: ActionRef::Dispatch { args, .. },
+                ..
+            } => args.iter().for_each(|(_, v)| v.walk(f)),
+            FrameworkValue::Token {
+                args: Some(args), ..
+            } => args.iter().for_each(|a| a.value.walk_exprs(f)),
+            FrameworkValue::Content(nodes) | FrameworkValue::View(nodes) => {
+                nodes.iter().for_each(|n| n.walk_exprs(f))
+            }
+            _ => {}
+        }
+    }
+
+    /// 内容闭包中的视图
+    pub fn nodes(&self) -> &[ViewNode] {
+        match self {
+            FrameworkValue::Content(nodes) | FrameworkValue::View(nodes) => nodes,
+            _ => &[],
+        }
+    }
+}
+
 impl ViewNode {
     /// 遍历视图树中的全部组件
     pub fn walk_elements(&self, f: &mut dyn FnMut(&Element)) {
@@ -526,8 +606,15 @@ impl ViewNode {
             ViewNode::Element(el) => {
                 f(el);
                 el.children.iter().for_each(|c| c.walk_elements(f));
+                if let ElementKind::SwiftUi(call) = &el.kind {
+                    for a in &call.args {
+                        a.value.nodes().iter().for_each(|c| c.walk_elements(f));
+                    }
+                }
             }
-            ViewNode::If { then, else_, .. } | ViewNode::Cond { then, else_, .. } => {
+            ViewNode::If { then, else_, .. }
+            | ViewNode::Cond { then, else_, .. }
+            | ViewNode::Available { then, else_, .. } => {
                 then.iter().chain(else_).for_each(|c| c.walk_elements(f));
             }
             ViewNode::Native(_) => {}

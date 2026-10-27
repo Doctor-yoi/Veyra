@@ -113,7 +113,9 @@ impl Program {
             }
             match n {
                 ViewNode::Element(el) => el.children.iter().any(|c| visit(c, pred)),
-                ViewNode::If { then, else_, .. } | ViewNode::Cond { then, else_, .. } => {
+                ViewNode::If { then, else_, .. }
+                | ViewNode::Cond { then, else_, .. }
+                | ViewNode::Available { then, else_, .. } => {
                     then.iter().chain(else_).any(|c| visit(c, pred))
                 }
                 ViewNode::Native(_) => false,
