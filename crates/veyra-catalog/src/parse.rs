@@ -965,6 +965,10 @@ impl Mapper<'_> {
             }
             return Err(format!("泛型约束{}", cons.join(" & ")));
         }
+        // 泛型数值的步长，例如`V.Stride`
+        if t.ends_with(".Stride") {
+            return Ok(ParamType::Number);
+        }
         if self.token_types.contains(&t) {
             return Ok(ParamType::Token(t));
         }

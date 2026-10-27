@@ -478,6 +478,7 @@ dependencies = [
  "toml",
  "veyra-backend-compose",
  "veyra-backend-swiftui",
+ "veyra-catalog",
  "veyra-codegen",
  "veyra-diagnostics",
  "veyra-ir",
@@ -540,6 +541,7 @@ version = "0.1.0"
 dependencies = [
  "indexmap",
  "insta",
+ "veyra-catalog",
  "veyra-diagnostics",
  "veyra-ir",
  "veyra-syntax",

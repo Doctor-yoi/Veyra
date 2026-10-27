@@ -8565,6 +8565,11 @@
             "type": {
               "binding": "number"
             }
+          },
+          {
+            "label": "step",
+            "type": "number",
+            "default": true
           }
         ],
         "availability": {
@@ -8601,6 +8606,11 @@
             "type": {
               "binding": "number"
             }
+          },
+          {
+            "label": "step",
+            "type": "number",
+            "default": true
           }
         ],
         "availability": {
@@ -8632,6 +8642,11 @@
             "type": {
               "binding": "number"
             }
+          },
+          {
+            "label": "step",
+            "type": "number",
+            "default": true
           },
           {
             "label": "label",

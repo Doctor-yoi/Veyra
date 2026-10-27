@@ -71,6 +71,15 @@ pub trait Backend {
 
     fn generate(&self, input: &BackendInput<'_>) -> Result<Vec<OutputFile>, Diagnostics>;
 
+    /// 各Apple系统的最低版本，未配置的系统使用默认值
+    fn deployment_targets(
+        &self,
+        options: &toml::Table,
+    ) -> Result<Vec<(AppleOs, String)>, Diagnostics> {
+        let _ = options;
+        Ok(Vec::new())
+    }
+
     /// 启用的Apple系统，非Apple后端返回空列表
     fn apple_oses(&self, options: &toml::Table) -> Result<Vec<AppleOs>, Diagnostics> {
         let _ = options;

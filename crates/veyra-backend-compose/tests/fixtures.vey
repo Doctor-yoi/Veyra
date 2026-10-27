@@ -94,10 +94,28 @@ screen Schedule {
         #else
         Text("release build")
         #endif
+        #if apple
+        if available(ios: 26) {
+          Text("glass").swiftui.glassEffect(.regular, in: .capsule)
+        } else {
+          Text("plain")
+        }
+        swiftui.Menu(loc("schedule.more", "更多")) {
+          Button(loc("schedule.refresh", "刷新"), action: refresh)
+        }
+        swiftui.Section(header: { Text("头部") }) {
+          Text("内容")
+        }
+        swiftui.Stepper("音量", value: bind(volume), step: 0.1)
+        swiftui.Link("Veyra", destination: "https://github.com/Doctor-yoi/Veyra")
+        swiftui.ContentUnavailableView(loc("schedule.none", "没有内容"), systemImage: "tray")
+        Text(query)
+          .swiftui.textInputAutocapitalization(.never)
+          .swiftui.foregroundStyle(.tint)
+          .swiftui.refreshable(action: refresh)
+          .swiftui.navigationTitle(loc("schedule.title", "我的课表"))
+        #endif
         Text("tag")
-          #if ios
-          .swiftui.glassEffect()
-          #endif
           #if debug
           .padding(4)
           #endif

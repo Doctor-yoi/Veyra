@@ -74,6 +74,40 @@ expression: f.contents
         }
       }
     },
+    "schedule.more": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更多"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "更多"
+          }
+        }
+      }
+    },
+    "schedule.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有内容"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "没有内容"
+          }
+        }
+      }
+    },
     "schedule.notify": {
       "extractionState": "manual",
       "localizations": {

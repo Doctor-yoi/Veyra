@@ -23,6 +23,16 @@ enum L10n {
         String(localized: "schedule.items", defaultValue: "\(count)门课", table: "Veyra")
     }
 
+    /// 更多
+    static var scheduleMore: String {
+        String(localized: "schedule.more", defaultValue: "更多", table: "Veyra")
+    }
+
+    /// 没有内容
+    static var scheduleNone: String {
+        String(localized: "schedule.none", defaultValue: "没有内容", table: "Veyra")
+    }
+
     /// 上课提醒
     static var scheduleNotify: String {
         String(localized: "schedule.notify", defaultValue: "上课提醒", table: "Veyra")

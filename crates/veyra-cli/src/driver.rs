@@ -184,12 +184,30 @@ fn compile(dir: &Path, args: &BuildArgs, r: &mut Reporter) -> Option<Compiled> {
                 continue;
             }
         };
+        let mut deployment = veyra_sema::default_deployment();
+        match backend.deployment_targets(options) {
+            Ok(list) => {
+                for (os, v) in list {
+                    match veyra_catalog::Version::parse(&v) {
+                        Some(v) => {
+                            deployment.insert(os, v);
+                        }
+                        None => r.push(Diagnostic::error(
+                            "V9001",
+                            format!("deployment_targets中{os}的版本`{v}`无效"),
+                        )),
+                    }
+                }
+            }
+            Err(d) => r.extend(d),
+        }
         let target = Target {
             platform: backend.platform(),
             flags: flags.clone(),
             native,
             apple_oses,
             os: None,
+            deployment,
         };
         let analysis = analyze(&asts, &target);
         // 多个Apple系统时，IR保留系统差异，诊断由逐个系统的检查给出

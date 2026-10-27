@@ -5,8 +5,8 @@
 
 use veyra_codegen::CodeWriter;
 use veyra_ir::{
-    ActionRef, BindingRef, Builtin, Element, ElementKind, Expr, ExprKind, IosElement, IosModifier,
-    Modifier, ModifierKind, NativeSegment, Value, ViewNode,
+    ActionRef, BindingRef, Builtin, Element, ElementKind, Expr, ExprKind, FrameworkCall,
+    FrameworkValue, Modifier, ModifierKind, NativeSegment, SwiftConv, Value, ViewNode,
 };
 
 use crate::swift::{self, ExprCx, double_literal, plain_string_arg};
@@ -26,6 +26,29 @@ pub(crate) fn nodes(w: &mut CodeWriter, cx: ViewCx, nodes: &[ViewNode]) {
             ViewNode::If { cond, then, else_ } => {
                 w.line(format!("if {} {{", swift::expr(cx.expr, cond)));
                 if_tail(w, cx, then, else_);
+            }
+            ViewNode::Available {
+                versions,
+                then,
+                else_,
+            } => {
+                let list: Vec<_> = versions
+                    .iter()
+                    .map(|(os, v)| format!("{} {v}", os.swift_name()))
+                    .collect();
+                w.line(format!("if #available({}, *) {{", list.join(", ")));
+                w.indent();
+                self::nodes(w, cx, then);
+                w.dedent();
+                if else_.is_empty() {
+                    w.line("}");
+                } else {
+                    w.line("} else {");
+                    w.indent();
+                    self::nodes(w, cx, else_);
+                    w.dedent();
+                    w.line("}");
+                }
             }
             ViewNode::Cond { cond, then, else_ } => {
                 w.line(format!("#if {}", cond.swift()));
@@ -135,14 +158,7 @@ fn number(cx: ViewCx, v: Option<&Value>) -> Option<String> {
 fn element(w: &mut CodeWriter, cx: ViewCx, el: &Element) {
     let b = match &el.kind {
         ElementKind::Builtin(b) => b,
-        ElementKind::Ios(IosElement::ShareLink) => {
-            let text = format!(
-                "ShareLink({}, item: {})",
-                text_arg(cx, el.arg("_")),
-                e(cx, el.arg("item"))
-            );
-            return leaf(w, cx, text, el);
-        }
+        ElementKind::SwiftUi(call) => return framework_element(w, cx, call, el),
         ElementKind::Android(_) => return,
         ElementKind::Component(name) => {
             // 按声明顺序传参，与结构体的成员构造器一致
@@ -404,27 +420,121 @@ fn modifier(cx: ViewCx, m: &Modifier) -> Vec<String> {
         ModifierKind::AccessibilityLabel => {
             vec![format!(".accessibilityLabel({})", text_arg(cx, arg("_")))]
         }
-        ModifierKind::Ios(m) => {
-            let token = || {
-                arg("_")
-                    .and_then(Value::as_token)
-                    .unwrap_or_default()
-                    .to_string()
+        ModifierKind::SwiftUi => match &m.call {
+            Some(call) => vec![format!(".{}", framework_call(cx, call))],
+            None => Vec::new(),
+        },
+        ModifierKind::Android(_) => Vec::new(),
+    }
+}
+
+/// 视图闭包的文本，多行内容由CodeWriter逐行缩进
+fn closure_text(cx: ViewCx, nodes: &[ViewNode]) -> String {
+    let mut w = CodeWriter::new("    ");
+    w.line("{");
+    w.indent();
+    self::nodes(&mut w, cx, nodes);
+    w.dedent();
+    w.line("}");
+    w.finish().trim_end().to_string()
+}
+
+fn conv(cx: ViewCx, e: &Expr, c: SwiftConv) -> String {
+    match c {
+        SwiftConv::None => swift::expr(cx.expr, e),
+        SwiftConv::String => plain_string_arg(cx.expr, e),
+        SwiftConv::Text => match &e.kind {
+            ExprKind::String(s) => format!("Text(verbatim: {})", swift::string_literal(s)),
+            _ => format!("Text({})", swift::expr(cx.expr, e)),
+        },
+        SwiftConv::LocalizedKey => format!("LocalizedStringKey({})", swift::expr(cx.expr, e)),
+        SwiftConv::Float => format!("Float({})", swift::expr(cx.expr, e)),
+        SwiftConv::Url => format!("URL(string: {})!", swift::expr(cx.expr, e)),
+    }
+}
+
+fn framework_value(cx: ViewCx, v: &FrameworkValue) -> String {
+    match v {
+        FrameworkValue::Expr(e, c) => conv(cx, e, *c),
+        FrameworkValue::Action { action, is_async } => {
+            let stmt = match action {
+                ActionRef::Dispatch {
+                    action,
+                    args,
+                    is_async: target_async,
+                } => {
+                    let args: Vec<_> = args
+                        .iter()
+                        .map(|(n, v)| format!("{}: {}", n, swift::expr(cx.expr, v)))
+                        .collect();
+                    let call = format!("{}.{}({})", cx.vm, swift::ident(action), args.join(", "));
+                    match (is_async, target_async) {
+                        (true, true) => format!("await {call}"),
+                        (false, true) => format!("Task {{ await {call} }}"),
+                        _ => call,
+                    }
+                }
+                ActionRef::Param(name) => format!("{}()", swift::ident(name)),
             };
-            match m {
-                IosModifier::GlassEffect => vec![".veyraGlassEffect()".into()],
-                IosModifier::NavigationTitle => {
-                    vec![format!(".navigationTitle({})", text_arg(cx, arg("_")))]
+            format!("{{ {stmt} }}")
+        }
+        FrameworkValue::Binding(b) => binding(cx, Some(&Value::Binding(b.clone()))),
+        FrameworkValue::Token { member, args: None } => format!(".{}", swift::ident(member)),
+        FrameworkValue::Token {
+            member,
+            args: Some(args),
+        } => {
+            format!(".{}({})", swift::ident(member), framework_args(cx, args))
+        }
+        FrameworkValue::Content(nodes) => closure_text(cx, nodes),
+        FrameworkValue::View(nodes) => {
+            let text = closure_text(cx, nodes);
+            match nodes.as_slice() {
+                [_] if text.lines().count() == 3 => {
+                    text.lines().nth(1).unwrap_or_default().trim().to_string()
                 }
-                IosModifier::TextInputAutocapitalization => {
-                    vec![format!(".textInputAutocapitalization(.{})", token())]
-                }
-                IosModifier::ListStyle => vec![format!(".listStyle(.{})", token())],
-                IosModifier::ScrollDismissesKeyboard => {
-                    vec![format!(".scrollDismissesKeyboard(.{})", token())]
-                }
+                _ => format!("Group {text}"),
             }
         }
-        ModifierKind::Android(_) => Vec::new(),
+    }
+}
+
+fn framework_args(cx: ViewCx, args: &[veyra_ir::FrameworkArg]) -> String {
+    args.iter()
+        .map(|a| {
+            let v = framework_value(cx, &a.value);
+            match &a.label {
+                Some(l) => format!("{l}: {v}"),
+                None => v,
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// `name(args)`，单个视图内容放在尾随闭包中
+fn framework_call(cx: ViewCx, call: &FrameworkCall) -> String {
+    let (args, trailing) = match (call.trailing_content, call.args.split_last()) {
+        (true, Some((last, rest))) => (rest, Some(&last.value)),
+        _ => (call.args.as_slice(), None),
+    };
+    let head = if args.is_empty() && trailing.is_some() {
+        call.name.clone()
+    } else {
+        format!("{}({})", call.name, framework_args(cx, args))
+    };
+    match trailing {
+        Some(FrameworkValue::Content(nodes)) => format!("{head} {}", closure_text(cx, nodes)),
+        _ => head,
+    }
+}
+
+fn framework_element(w: &mut CodeWriter, cx: ViewCx, call: &FrameworkCall, el: &Element) {
+    let text = framework_call(cx, call);
+    if text.ends_with('}') {
+        w.line(text);
+        trailing_modifiers(w, cx, &el.modifiers);
+    } else {
+        leaf(w, cx, text, el);
     }
 }
