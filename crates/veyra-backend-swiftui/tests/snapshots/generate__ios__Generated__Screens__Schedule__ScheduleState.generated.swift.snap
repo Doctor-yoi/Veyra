@@ -17,6 +17,7 @@ final class ScheduleState {
     var volume: Double = 0.5
     var notify: Bool = true
     var password: String = ""
+    var cardWidth: Double? = nil
 
     var count: Int { items.count }
     var canRefresh: Bool { !isRefreshing && count >= 0 }

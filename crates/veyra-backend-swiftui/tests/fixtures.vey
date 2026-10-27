@@ -39,6 +39,7 @@ screen Schedule {
     volume: Double = 0.5 @writable
     notify: Bool = true @writable
     password: String = "" @writable
+    cardWidth: Double? = nil
   }
 
   computed {
@@ -114,6 +115,7 @@ screen Schedule {
           .swiftui.foregroundStyle(.tint)
           .swiftui.refreshable(action: refresh)
           .swiftui.navigationTitle(loc("schedule.title", "我的课表"))
+          .swiftui.frame(width: cardWidth)
         #endif
         Text("tag")
           #if debug

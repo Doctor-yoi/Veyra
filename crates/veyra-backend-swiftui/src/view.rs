@@ -450,6 +450,11 @@ fn conv(cx: ViewCx, e: &Expr, c: SwiftConv) -> String {
         SwiftConv::LocalizedKey => format!("LocalizedStringKey({})", swift::expr(cx.expr, e)),
         SwiftConv::Float => format!("Float({})", swift::expr(cx.expr, e)),
         SwiftConv::Url => format!("URL(string: {})!", swift::expr(cx.expr, e)),
+        SwiftConv::OptionalNumber => format!("{}.map {{ .init($0) }}", swift::postfix(cx.expr, e)),
+        SwiftConv::OptionalUrl => format!(
+            "{}.flatMap {{ URL(string: $0) }}",
+            swift::postfix(cx.expr, e)
+        ),
     }
 }
 
