@@ -134,18 +134,25 @@ state {
 
 System conditions may guard screens, components, their members, views and modifiers. `debug` is kept as `#if DEBUG` on Apple systems and `BuildConfig.DEBUG` on Android, so it can only guard views and modifiers. Android projects need `buildFeatures.buildConfig = true`.
 
-Framework-specific components and modifiers live under `swiftui.*` and `compose.*`, such as `swiftui.ShareLink`, `.swiftui.glassEffect()`, `compose.FloatingActionButton` and `.compose.imePadding()`, and must be used inside `#if apple` or `#if android`. As a last resort, `native swiftui { """...""" }` emits code verbatim, with `{{name}}` replaced by state reads or action entry points. Native blocks bypass type checking, so they produce a warning that `[lint] native` can turn off or into an error.
+Framework-specific components and modifiers live under `swiftui.*` and `compose.*` and must be used inside `#if apple` or `#if android`. `swiftui.*` is backed by a catalog generated from the SDK interfaces, so almost every SwiftUI view and modifier whose parameters map to Veyra types is available, with overloads resolved and arguments type checked like built-in components. Each API records its availability per system. Using an API newer than `[swiftui] deployment_targets` (iOS 17, macOS 14, watchOS 10, tvOS 17 and visionOS 1 by default) requires an `if available` block, which becomes `if #available`:
 
 ```
 #if apple
-Text(title).swiftui.glassEffect()
+if available(ios: 26, macos: 26) {
+  Text(title).swiftui.glassEffect(.regular, in: .capsule)
+} else {
+  Text(title)
+}
+swiftui.Menu(loc("home.more", "More")) {
+  Button(loc("home.refresh", "Refresh"), action: refresh)
+}
+Text(title).swiftui.refreshable(action: refresh)
 #elseif android
 compose.FloatingActionButton("+", action: add)
 #endif
-#if debug
-Text(buildInfo)
-#endif
 ```
+
+Run `cargo run -p veyra-catalog` on a machine with Xcode to regenerate `catalog/swiftui.json` from the installed SDKs, and `cargo run -p veyra-catalog -- --explain Name` to see why an overload was left out. As a last resort, `native swiftui { """...""" }` emits code verbatim, with `{{name}}` replaced by state reads or action entry points. Native blocks bypass type checking, so they produce a warning that `[lint] native` can turn off or into an error.
 
 Localized text is declared explicitly with `loc(key, sourceText, args...)`. Translations live in `locales/<locale>.toml`, which `veyra build` keeps in sync: new keys are added as empty placeholders, existing translations are preserved, and placeholders are validated against the source text. Plain string literals are emitted verbatim.
 

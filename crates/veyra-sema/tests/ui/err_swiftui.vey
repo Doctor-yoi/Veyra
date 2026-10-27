@@ -1,0 +1,32 @@
+// SwiftUI目录
+screen Home {
+  state {
+    on: Bool = false @writable
+    title: String = ""
+  }
+  actions {
+    go()
+  }
+  view {
+    Column {
+      #if apple
+      swiftui.Toggle("开关", isOn: bind(title))
+      swiftui.NoSuchView()
+      Text("x").swiftui.noSuchModifier()
+      Text("x").swiftui.glassEffect()
+      Text("x").swiftui.font(.giant)
+      Text("x").swiftui.padding(.all, "8")
+      swiftui.Menu("菜单", primaryAction: go) {
+        Text("项")
+      }
+      if available(ios: 26) {
+        Text("x").swiftui.glassEffect()
+      }
+      if available(android: 3) {
+        Text("x")
+      }
+      swiftui.ShareLink(item: "x", subject: nil)
+      #endif
+    }
+  }
+}

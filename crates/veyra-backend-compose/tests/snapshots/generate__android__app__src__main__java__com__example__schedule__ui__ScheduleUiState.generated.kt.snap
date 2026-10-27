@@ -14,6 +14,7 @@ data class ScheduleUiState(
     val volume: Double = 0.5,
     val notify: Boolean = true,
     val password: String = "",
+    val cardWidth: Double? = null,
 ) {
     val count: Int
         get() = items.size

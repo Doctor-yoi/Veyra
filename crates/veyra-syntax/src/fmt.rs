@@ -668,6 +668,45 @@ fn modifier(m: &Modifier) -> String {
     format!(".{}({})", path_string(&m.path), args(&m.args))
 }
 
+/// 参数中的视图闭包，多行文本由调用方逐行缩进
+fn closure_text(c: &Closure) -> String {
+    let parsed = Parsed {
+        file: File {
+            id: c.span.file,
+            path: String::new(),
+            imports: Vec::new(),
+            items: Vec::new(),
+        },
+        comments: Vec::new(),
+        diagnostics: Default::default(),
+    };
+    let mut f = Formatter {
+        src: "",
+        comments: &parsed.comments,
+        next: 0,
+        lines: Vec::new(),
+        level: 1,
+    };
+    let mut emit = |f: &mut Formatter<'_>, n: &ViewNode| f.view_node(n);
+    f.nodes(&c.body, None, &mut emit);
+    let head = if c.params.is_empty() {
+        "{".to_string()
+    } else {
+        format!(
+            "{{ {} in",
+            c.params
+                .iter()
+                .map(|p| p.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    };
+    if f.lines.is_empty() {
+        return "{}".into();
+    }
+    format!("{head}\n{}\n}}", f.lines.join("\n"))
+}
+
 /// 表达式按原有结构输出，括号只来自源码中的`Paren`
 pub(crate) fn expr(e: &Expr) -> String {
     match &e.kind {
@@ -694,6 +733,7 @@ pub(crate) fn expr(e: &Expr) -> String {
             items.iter().map(expr).collect::<Vec<_>>().join(", ")
         ),
         ExprKind::Paren(inner) => format!("({})", expr(inner)),
+        ExprKind::Closure(c) => closure_text(c),
         ExprKind::Error => String::new(),
     }
 }

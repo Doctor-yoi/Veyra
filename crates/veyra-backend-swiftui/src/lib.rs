@@ -25,9 +25,7 @@ use std::path::PathBuf;
 use serde::Deserialize;
 use veyra_codegen::{Backend, BackendInput, CodeWriter, GENERATED_NOTICE, OutputFile, camel_case};
 use veyra_diagnostics::{Diagnostic, Diagnostics};
-use veyra_ir::{
-    AppleOs, ComponentParamType, IosModifier, ModifierKind, NativeCond, Platform, Program,
-};
+use veyra_ir::{AppleOs, ComponentParamType, NativeCond, Platform, Program};
 
 use crate::swift::ident;
 
@@ -129,6 +127,18 @@ impl Backend for SwiftUiBackend {
         Ok(Options::parse(options)?.oses())
     }
 
+    fn deployment_targets(
+        &self,
+        options: &toml::Table,
+    ) -> Result<Vec<(AppleOs, String)>, Diagnostics> {
+        let options = Options::parse(options)?;
+        Ok(options
+            .deployment_targets
+            .iter()
+            .filter_map(|(os, v)| AppleOs::from_cfg_name(os).map(|o| (o, v.clone())))
+            .collect())
+    }
+
     fn generate(&self, input: &BackendInput<'_>) -> Result<Vec<OutputFile>, Diagnostics> {
         let options = Options::parse(input.options)?;
         let mut files = Vec::new();
@@ -205,12 +215,6 @@ impl Backend for SwiftUiBackend {
             files.push(OutputFile::generated(
                 dir.join("VeyraPreferences.generated.swift"),
                 preferences::support(program),
-            ));
-        }
-        if program.any_modifier(|m| m.kind == ModifierKind::Ios(IosModifier::GlassEffect)) {
-            files.push(OutputFile::generated(
-                out.join("VeyraPlatform.generated.swift"),
-                platform_support(),
             ));
         }
         if !program.components.is_empty() {
@@ -450,33 +454,6 @@ fn injected_types(program: &Program) -> Vec<&str> {
     types.sort();
     types.dedup();
     types
-}
-
-/// 平台修饰符的兼容封装
-fn platform_support() -> String {
-    let mut w = CodeWriter::new("    ");
-    header(&mut w, &["SwiftUI"]);
-    w.block("extension View {", "}", |w| {
-        w.line(
-            "/// Applies Liquid Glass on iOS 26 and later, earlier systems keep the view unchanged",
-        );
-        w.line("@ViewBuilder");
-        w.block("func veyraGlassEffect() -> some View {", "}", |w| {
-            // 旧版Xcode的SDK中没有glassEffect，按编译器版本区分
-            w.line("#if compiler(>=6.2)");
-            w.block("if #available(iOS 26.0, *) {", "} else {", |w| {
-                w.line("glassEffect()")
-            });
-            w.indent();
-            w.line("self");
-            w.dedent();
-            w.line("}");
-            w.line("#else");
-            w.line("self");
-            w.line("#endif");
-        });
-    });
-    w.finish()
 }
 
 /// 在原生条件内输出

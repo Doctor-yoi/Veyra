@@ -3,21 +3,22 @@ source: crates/veyra-sema/tests/ui.rs
 expression: out
 ---
 [ios]
-error[V1011]: 未知的组件`swiftui.Unknown`
+error[V1011]: SwiftUI中没有可用的组件`Unknown`
   --> err_platform.vey:13:15
    |
 13 |       swiftui.Unknown()
    |               ^^^^^^^
    |
-   = note: swiftui专属组件：ShareLink
+   = note: 目录只收录参数能映射到Veyra类型的API，可以用veyra-catalog --explain查看原因
 
-error[V1012]: 未知的修饰符`.swiftui.blur`
+error[V2075]: `.swiftui.blur`没有与实参匹配的重载
   --> err_platform.vey:14:25
    |
 14 |       Text("x").swiftui.blur()
    |                         ^^^^
    |
-   = note: swiftui专属修饰符：glassEffect、navigationTitle、textInputAutocapitalization、listStyle、scrollDismissesKeyboard
+   = note: 可用的重载：
+  .swiftui.blur(radius: Double, opaque: Bool = 默认值)
 
 error[V6020]: `ios.*`已改名为`swiftui.*`
   --> err_platform.vey:15:7

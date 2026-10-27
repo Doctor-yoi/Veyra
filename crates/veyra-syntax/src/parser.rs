@@ -1133,6 +1133,14 @@ impl<'a> Parser<'a> {
                     span: t.span.to(end),
                 });
             }
+            T::LBrace => {
+                let c = self.closure()?;
+                let span = c.span;
+                return Some(Expr {
+                    kind: ExprKind::Closure(c),
+                    span,
+                });
+            }
             T::LBracket => {
                 self.bump();
                 let mut items = Vec::new();

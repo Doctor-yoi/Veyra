@@ -134,18 +134,25 @@ state {
 
 系统条件可以用于screen、component及其成员、视图与修饰符。`debug`在Apple系统上保留为`#if DEBUG`，在Android上为`BuildConfig.DEBUG`，因此只能用于视图与修饰符，Android工程需要开启`buildFeatures.buildConfig = true`。
 
-框架专属的组件与修饰符位于`swiftui.*`与`compose.*`下，例如`swiftui.ShareLink`、`.swiftui.glassEffect()`、`compose.FloatingActionButton`与`.compose.imePadding()`，需要放在`#if apple`或`#if android`中使用。如果仍不够用，可以用`native swiftui { """...""" }`原样输出代码，其中`{{name}}`会替换为状态读取或action入口。native代码块不受类型检查，编译时会给出警告，可通过`[lint] native`关闭或升级为错误。
+框架专属的组件与修饰符位于`swiftui.*`与`compose.*`下，需要放在`#if apple`或`#if android`中使用。`swiftui.*`背后是从SDK接口生成的目录，参数能映射到Veyra类型的SwiftUI视图与修饰符几乎都可以直接使用，并像内置组件一样做重载解析与参数类型检查。每个API都记录了各系统的可用性，使用高于`[swiftui] deployment_targets`的API（默认iOS 17、macOS 14、watchOS 10、tvOS 17、visionOS 1）时必须写在`if available`中，生成`if #available`：
 
 ```
 #if apple
-Text(title).swiftui.glassEffect()
+if available(ios: 26, macos: 26) {
+  Text(title).swiftui.glassEffect(.regular, in: .capsule)
+} else {
+  Text(title)
+}
+swiftui.Menu(loc("home.more", "更多")) {
+  Button(loc("home.refresh", "刷新"), action: refresh)
+}
+Text(title).swiftui.refreshable(action: refresh)
 #elseif android
 compose.FloatingActionButton("+", action: add)
 #endif
-#if debug
-Text(buildInfo)
-#endif
 ```
+
+在装有Xcode的机器上运行`cargo run -p veyra-catalog`可从本机SDK重新生成`catalog/swiftui.json`，`cargo run -p veyra-catalog -- --explain Name`可查看某个重载未被收录的原因。如果仍不够用，可以用`native swiftui { """...""" }`原样输出代码，其中`{{name}}`会替换为状态读取或action入口。native代码块不受类型检查，编译时会给出警告，可通过`[lint] native`关闭或升级为错误。
 
 本地化文案通过`loc(key, 源文案, 参数...)`显式声明。翻译存放在`locales/<locale>.toml`中，由`veyra build`自动同步：新增的key写入空占位，已有翻译原样保留，翻译中的占位符与源文案逐一核对。普通字符串字面量原样输出，不参与本地化。
 

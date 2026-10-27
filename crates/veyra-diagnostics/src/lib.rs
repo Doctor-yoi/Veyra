@@ -136,6 +136,20 @@ impl Diagnostics {
         self.items.is_empty()
     }
 
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    /// 回退到之前的数量，用于尝试性检查
+    pub fn truncate(&mut self, len: usize) {
+        self.items.truncate(len);
+    }
+
+    /// 取出某个位置之后的诊断
+    pub fn split_off(&mut self, at: usize) -> Vec<Diagnostic> {
+        self.items.split_off(at)
+    }
+
     pub fn iter(&self) -> std::slice::Iter<'_, Diagnostic> {
         self.items.iter()
     }

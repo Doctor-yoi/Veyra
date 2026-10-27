@@ -27,8 +27,32 @@ struct ScheduleView<ViewModel: ScheduleViewModelContract>: View {
                 #else
                 Text(verbatim: "release build")
                 #endif
+                if #available(iOS 26, *) {
+                    Text(verbatim: "glass")
+                        .glassEffect(.regular, in: .capsule)
+                } else {
+                    Text(verbatim: "plain")
+                }
+                Menu(L10n.scheduleMore) {
+                    Button(L10n.scheduleRefresh) {
+                        Task { await viewModel.refresh() }
+                    }
+                }
+                Section(content: {
+                    Text(verbatim: "内容")
+                }, header: {
+                    Text(verbatim: "头部")
+                })
+                Stepper(String("音量"), value: Binding(get: { viewModel.state.volume }, set: { viewModel.setVolume($0) }), step: 0.1)
+                Link(String("Veyra"), destination: URL(string: "https://github.com/Doctor-yoi/Veyra")!)
+                ContentUnavailableView(L10n.scheduleNone, systemImage: "tray")
+                Text(viewModel.state.query)
+                    .textInputAutocapitalization(.never)
+                    .foregroundStyle(.tint)
+                    .refreshable(action: { await viewModel.refresh() })
+                    .navigationTitle(L10n.scheduleTitle)
+                    .frame(width: viewModel.state.cardWidth.map { .init($0) })
                 Text(verbatim: "tag")
-                    .veyraGlassEffect()
                     #if DEBUG
                     .padding(4.0)
                     #endif

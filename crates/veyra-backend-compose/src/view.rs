@@ -87,6 +87,8 @@ impl ViewEmitter<'_> {
                     w.line(format!("if ({c}) {{"));
                     self.if_tail(w, then, else_, parent);
                 }
+                // Android上没有系统版本差异，直接使用较新版本的分支
+                ViewNode::Available { then, .. } => self.nodes(w, then, parent),
                 ViewNode::Cond { cond, then, else_ } => {
                     let c = self.native_cond(cond);
                     w.line(format!("if ({c}) {{"));
@@ -305,7 +307,7 @@ impl ViewEmitter<'_> {
                     self.im.add(name);
                     parts.push(call);
                 }
-                ModifierKind::Ios(_)
+                ModifierKind::SwiftUi
                 | ModifierKind::Font
                 | ModifierKind::Foreground
                 | ModifierKind::Disabled => {}
@@ -441,7 +443,7 @@ impl ViewEmitter<'_> {
                 w.line("}");
                 return;
             }
-            ElementKind::Ios(_) => return,
+            ElementKind::SwiftUi(_) => return,
             ElementKind::Component(name) => {
                 let mut call = Call::new(name);
                 for (n, v) in &el.args {

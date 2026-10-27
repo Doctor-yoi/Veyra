@@ -3,10 +3,7 @@
 
 //! 内置组件与修饰符的参数表
 
-use veyra_ir::{
-    AndroidElement, AndroidModifier, Builtin, ElementKind, IosElement, IosModifier, ModifierKind,
-    Type,
-};
+use veyra_ir::{AndroidElement, AndroidModifier, Builtin, ElementKind, ModifierKind, Type};
 
 /// 参数种类
 #[derive(Clone, Debug)]
@@ -163,21 +160,10 @@ const CONTROLS: &[Builtin] = &[
     Builtin::Slider,
 ];
 
-const AUTOCAPITALIZATION: &[&str] = &["never", "words", "sentences", "characters"];
-const LIST_STYLES: &[&str] = &["plain", "inset", "insetGrouped", "grouped", "sidebar"];
-const KEYBOARD_DISMISS: &[&str] = &["immediately", "interactively", "never"];
-const TEXT_INPUTS: &[Builtin] = &[Builtin::TextField, Builtin::SecureField];
-const LISTS: &[Builtin] = &[Builtin::List];
-const SCROLLABLES: &[Builtin] = &[Builtin::ScrollView, Builtin::List];
-
 /// 平台专属组件，`platform`为`ios`或`android`
 pub(crate) fn platform_element(platform: &str, name: &str) -> Option<(ElementKind, ElementSpec)> {
     use ArgKind::*;
     let (kind, args) = match (platform, name) {
-        ("swiftui", "ShareLink") => (
-            ElementKind::Ios(IosElement::ShareLink),
-            vec![req("_", Text), req("item", Expr(Type::String))],
-        ),
         ("compose", "FloatingActionButton") => (
             ElementKind::Android(AndroidElement::FloatingActionButton),
             vec![req("_", Text), req("action", Action)],
@@ -193,29 +179,12 @@ pub(crate) fn platform_element(platform: &str, name: &str) -> Option<(ElementKin
     ))
 }
 
-pub(crate) const IOS_ELEMENTS: &[&str] = &["ShareLink"];
 pub(crate) const ANDROID_ELEMENTS: &[&str] = &["FloatingActionButton"];
-pub(crate) const IOS_MODIFIERS: &[&str] = &[
-    "glassEffect",
-    "navigationTitle",
-    "textInputAutocapitalization",
-    "listStyle",
-    "scrollDismissesKeyboard",
-];
 pub(crate) const ANDROID_MODIFIERS: &[&str] = &["imePadding", "systemBarsPadding", "testTag"];
 
 /// 平台专属修饰符
 pub(crate) fn platform_modifier(platform: &str, name: &str) -> Option<ModifierKind> {
     Some(match (platform, name) {
-        ("swiftui", "glassEffect") => ModifierKind::Ios(IosModifier::GlassEffect),
-        ("swiftui", "navigationTitle") => ModifierKind::Ios(IosModifier::NavigationTitle),
-        ("swiftui", "textInputAutocapitalization") => {
-            ModifierKind::Ios(IosModifier::TextInputAutocapitalization)
-        }
-        ("swiftui", "listStyle") => ModifierKind::Ios(IosModifier::ListStyle),
-        ("swiftui", "scrollDismissesKeyboard") => {
-            ModifierKind::Ios(IosModifier::ScrollDismissesKeyboard)
-        }
         ("compose", "imePadding") => ModifierKind::Android(AndroidModifier::ImePadding),
         ("compose", "systemBarsPadding") => {
             ModifierKind::Android(AndroidModifier::SystemBarsPadding)
@@ -236,17 +205,7 @@ pub(crate) fn is_parameter_modifier(kind: ModifierKind) -> bool {
 pub(crate) fn modifier(kind: ModifierKind) -> ModifierSpec {
     use ArgKind::*;
     let (args, applies_to) = match kind {
-        ModifierKind::Ios(m) => match m {
-            IosModifier::GlassEffect => (vec![], None),
-            IosModifier::NavigationTitle => (vec![req("_", Text)], None),
-            IosModifier::TextInputAutocapitalization => {
-                (vec![req("_", Token(AUTOCAPITALIZATION))], Some(TEXT_INPUTS))
-            }
-            IosModifier::ListStyle => (vec![req("_", Token(LIST_STYLES))], Some(LISTS)),
-            IosModifier::ScrollDismissesKeyboard => {
-                (vec![req("_", Token(KEYBOARD_DISMISS))], Some(SCROLLABLES))
-            }
-        },
+        ModifierKind::SwiftUi => (vec![], None),
         ModifierKind::Android(m) => match m {
             AndroidModifier::ImePadding | AndroidModifier::SystemBarsPadding => (vec![], None),
             AndroidModifier::TestTag => (vec![req("_", Expr(Type::String))], None),

@@ -10,6 +10,7 @@ repository.workspace = true
 homepage.workspace = true
 
 [dependencies]
+veyra-catalog.workspace = true
 indexmap.workspace = true
 veyra-diagnostics.workspace = true
 veyra-ir.workspace = true
