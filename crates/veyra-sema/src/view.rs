@@ -34,6 +34,30 @@ impl<'a> Checker<'a> {
     }
 
     fn if_node(&mut self, sc: &mut Scope, node: &'a ast::IfNode) -> ir::ViewNode {
+        // if available(ios: 26) { } else { }
+        if let A::Call(callee, args) = &node.cond.kind
+            && matches!(&callee.kind, A::Ident(n) if n == "available")
+        {
+            let versions = self.available_versions(args, node.cond.span);
+            let depth = sc.available.len();
+            sc.available.extend(versions.iter().copied());
+            let then = self.view_nodes(sc, &node.then);
+            sc.available.truncate(depth);
+            let else_ = match &node.else_ {
+                None => Vec::new(),
+                Some(ast::ElseBranch::Block(items, _)) => self.view_nodes(sc, items),
+                Some(ast::ElseBranch::If(nested)) => vec![self.if_node(sc, nested)],
+            };
+            let versions = versions
+                .into_iter()
+                .map(|(os, v)| (os, v.to_string()))
+                .collect();
+            return ir::ViewNode::Available {
+                versions,
+                then,
+                else_,
+            };
+        }
         let cond = self.expr(sc, &node.cond, Some(&Type::Bool));
         let then = self.view_nodes(sc, &node.then);
         let else_ = match &node.else_ {
@@ -287,12 +311,11 @@ impl<'a> Checker<'a> {
         if !self.check_platform(ns, &full, el.span) {
             return None;
         }
+        if ns.name == "swiftui" {
+            return self.swiftui_element(sc, el, name);
+        }
         let Some((kind, spec)) = catalog::platform_element(&ns.name, &name.name) else {
-            let all = if ns.name == "swiftui" {
-                catalog::IOS_ELEMENTS
-            } else {
-                catalog::ANDROID_ELEMENTS
-            };
+            let all = catalog::ANDROID_ELEMENTS;
             self.diags.push(
                 Diagnostic::error("V1011", format!("未知的组件`{full}`"))
                     .with_label(name.span, "")
@@ -331,11 +354,7 @@ impl<'a> Checker<'a> {
         }
         let kind = catalog::platform_modifier(&ns.name, &name.name);
         if kind.is_none() {
-            let all = if ns.name == "swiftui" {
-                catalog::IOS_MODIFIERS
-            } else {
-                catalog::ANDROID_MODIFIERS
-            };
+            let all = catalog::ANDROID_MODIFIERS;
             self.diags.push(
                 Diagnostic::error("V1012", format!("未知的修饰符`{full}`"))
                     .with_label(name.span, "")
@@ -468,7 +487,7 @@ impl<'a> Checker<'a> {
         }
     }
 
-    fn modifiers(
+    pub(crate) fn modifiers(
         &mut self,
         sc: &mut Scope,
         nodes: &'a [ast::Node<ast::Modifier>],
@@ -479,6 +498,23 @@ impl<'a> Checker<'a> {
         for p in pruned {
             let m = p.item;
             let name = m.path.last().unwrap_or(&m.path[0]);
+            // SwiftUI目录中的修饰符
+            if let [ns, inner] = m.path.as_slice()
+                && ns.name == "swiftui"
+            {
+                if !self.check_platform(ns, &format!(".swiftui.{}", inner.name), m.span) {
+                    continue;
+                }
+                if let Some(call) = self.swiftui_modifier(sc, m, inner) {
+                    out.push(ir::Modifier {
+                        kind: ModifierKind::SwiftUi,
+                        args: IndexMap::new(),
+                        cond: p.cond.clone(),
+                        call: Some(call),
+                    });
+                }
+                continue;
+            }
             let kind = if m.path.len() > 1 {
                 match self.platform_modifier(m) {
                     Some(k) => Some(k),
@@ -540,6 +576,7 @@ impl<'a> Checker<'a> {
                 kind,
                 args,
                 cond: p.cond.clone(),
+                call: None,
             });
         }
         out

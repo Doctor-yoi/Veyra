@@ -47,6 +47,8 @@ pub(crate) struct Scope<'s> {
     pub locals: Vec<(String, Type)>,
     /// 是否允许loc，只有view中允许
     pub allow_loc: bool,
+    /// 外层`if available(...)`提高的系统版本
+    pub available: Vec<(veyra_ir::AppleOs, veyra_catalog::Version)>,
 }
 
 impl<'s> Scope<'s> {
@@ -55,7 +57,21 @@ impl<'s> Scope<'s> {
             owner,
             locals: Vec::new(),
             allow_loc,
+            available: Vec::new(),
         }
+    }
+
+    /// 当前作用域中某个系统的最低版本
+    pub fn min_version(
+        &self,
+        os: veyra_ir::AppleOs,
+        deployment: veyra_catalog::Version,
+    ) -> veyra_catalog::Version {
+        self.available
+            .iter()
+            .filter(|(o, _)| *o == os)
+            .map(|(_, v)| *v)
+            .fold(deployment, std::cmp::max)
     }
 
     fn screen(&self) -> Option<&'s ScreenInfo> {
@@ -270,6 +286,10 @@ impl<'a> Checker<'a> {
                 ir::Expr::new(ExprKind::List(out), Type::list(elem))
             }
             A::Paren(inner) => self.expr(sc, inner, expected),
+            A::Closure(c) => {
+                self.error("V2074", "视图闭包只能作为组件参数", c.span, "");
+                ir::Expr::unknown()
+            }
             A::Error => ir::Expr::unknown(),
         }
     }
@@ -1117,10 +1137,12 @@ impl<'a> Checker<'a> {
         let (name, span) = target;
         if let Some(pty) = sc.component_param(name) {
             return match pty {
-                ComponentParamType::Binding(t) if t == ty => Some(BindingRef::Param {
-                    name: name.to_string(),
-                    ty: t.clone(),
-                }),
+                ComponentParamType::Binding(t) if t == ty || ty.is_unknown() => {
+                    Some(BindingRef::Param {
+                        name: name.to_string(),
+                        ty: t.clone(),
+                    })
+                }
                 ComponentParamType::Binding(t) => {
                     self.mismatch(span, ty, t);
                     None
@@ -1145,7 +1167,8 @@ impl<'a> Checker<'a> {
                 );
                 return None;
             }
-            if state.ty != *ty && !state.ty.is_unknown() {
+            // Unknown表示接受任意类型，由调用方另行检查
+            if state.ty != *ty && !state.ty.is_unknown() && !ty.is_unknown() {
                 self.mismatch(span, ty, &state.ty);
                 return None;
             }

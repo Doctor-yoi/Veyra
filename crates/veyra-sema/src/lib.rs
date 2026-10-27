@@ -18,12 +18,15 @@ mod cfg;
 mod component;
 mod decls;
 mod expr;
+mod framework;
 mod screen;
 mod storage;
 mod view;
 
 use indexmap::IndexMap;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
+
+use veyra_catalog::Version;
 
 use veyra_diagnostics::{Diagnostic, Diagnostics, FileId, Span};
 use veyra_ir::{
@@ -54,6 +57,22 @@ pub struct Target {
     pub apple_oses: Vec<AppleOs>,
     /// 按单个系统检查时的系统，None表示把系统差异保留为原生条件
     pub os: Option<AppleOs>,
+    /// 各系统的最低版本
+    pub deployment: BTreeMap<AppleOs, Version>,
+}
+
+/// 未配置时的最低版本
+pub fn default_deployment() -> BTreeMap<AppleOs, Version> {
+    [
+        (AppleOs::Ios, "17.0"),
+        (AppleOs::Macos, "14.0"),
+        (AppleOs::Watchos, "10.0"),
+        (AppleOs::Tvos, "17.0"),
+        (AppleOs::Visionos, "1.0"),
+    ]
+    .into_iter()
+    .filter_map(|(os, v)| Version::parse(v).map(|v| (os, v)))
+    .collect()
 }
 
 impl Target {
@@ -64,6 +83,7 @@ impl Target {
             native: NativeLint::Warn,
             apple_oses: vec![AppleOs::Ios],
             os: None,
+            deployment: default_deployment(),
         }
     }
 }

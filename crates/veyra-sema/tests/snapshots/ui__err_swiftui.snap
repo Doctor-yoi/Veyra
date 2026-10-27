@@ -1,0 +1,69 @@
+---
+source: crates/veyra-sema/tests/ui.rs
+expression: out
+---
+[ios]
+error[V3001]: state`title`是只读的，不能绑定
+  --> err_swiftui.vey:13:39
+   |
+13 |       swiftui.Toggle("开关", isOn: bind(title))
+   |                                         ^^^^^
+ 5 |     title: String = ""
+   |     ----- 在这里添加@writable
+   |
+   = note: 只有标记@writable的state才会生成setter并允许View写入
+
+error[V1011]: SwiftUI中没有可用的组件`NoSuchView`
+  --> err_swiftui.vey:14:15
+   |
+14 |       swiftui.NoSuchView()
+   |               ^^^^^^^^^^
+   |
+   = note: 目录只收录参数能映射到Veyra类型的API，可以用veyra-catalog --explain查看原因
+
+error[V1012]: SwiftUI中没有可用的修饰符`.noSuchModifier`
+  --> err_swiftui.vey:15:25
+   |
+15 |       Text("x").swiftui.noSuchModifier()
+   |                         ^^^^^^^^^^^^^^
+   |
+   = note: 目录只收录参数能映射到Veyra类型的API，可以用veyra-catalog --explain查看原因
+
+error[V6030]: `.swiftui.glassEffect`需要ios 26，当前最低版本为17
+  --> err_swiftui.vey:16:25
+   |
+16 |       Text("x").swiftui.glassEffect()
+   |                         ^^^^^^^^^^^
+   |
+   = note: 写在`if available(ios: 26) { ... }`中，或提高[swiftui] deployment_targets
+
+error[V2044]: `Font`没有成员`.giant`
+  --> err_swiftui.vey:17:31
+   |
+17 |       Text("x").swiftui.font(.giant)
+   |                               ^^^^^
+   |
+   = note: 可用取值：.body、.callout、.caption、.caption2、.custom、.default、.extraLargeTitle、.extraLargeTitle2、.footnote、.headline、.largeTitle、.subheadline、.system、.title、.title2、.title3
+
+error[V2001]: 类型不匹配：期望`Double`，实际为`String`
+  --> err_swiftui.vey:18:39
+   |
+18 |       Text("x").swiftui.padding(.all, "8")
+   |                                       ^^^ 类型为`String`
+
+error[V6033]: available至少需要一个系统版本
+  --> err_swiftui.vey:25:10
+   |
+25 |       if available(android: 3) {
+   |          ^^^^^^^^^^^^^^^^^^^^^
+
+error[V6033]: 未知的系统`android`
+  --> err_swiftui.vey:25:20
+   |
+25 |       if available(android: 3) {
+   |                    ^^^^^^^ 可用的系统：ios、macos、watchos、tvos、visionos
+
+error: 共8个错误，0个警告
+
+[android]
+无诊断

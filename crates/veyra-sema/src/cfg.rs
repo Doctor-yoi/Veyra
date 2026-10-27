@@ -58,6 +58,15 @@ impl<'t> Cfg<'t> {
         }
     }
 
+    /// 已确定的Apple系统，保留系统差异时为None
+    pub fn fixed_os(&self) -> Option<AppleOs> {
+        if self.residual.is_empty() {
+            self.fixed
+        } else {
+            None
+        }
+    }
+
     fn all(&self) -> Worlds {
         Worlds::all(self.residual.len())
     }

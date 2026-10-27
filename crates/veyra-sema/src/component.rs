@@ -103,7 +103,9 @@ impl<'a> Checker<'a> {
                         }
                         uses(&el.children, out);
                     }
-                    ViewNode::If { then, else_, .. } | ViewNode::Cond { then, else_, .. } => {
+                    ViewNode::If { then, else_, .. }
+                    | ViewNode::Cond { then, else_, .. }
+                    | ViewNode::Available { then, else_, .. } => {
                         uses(then, out);
                         uses(else_, out);
                     }
