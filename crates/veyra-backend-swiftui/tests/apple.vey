@@ -1,0 +1,41 @@
+screen Home {
+  state {
+    #if ios
+    haptics: Bool = true @writable
+    #endif
+    title: String = ""
+  }
+
+  actions {
+    #if macos
+    openWindow()
+    #endif
+    refresh()
+  }
+
+  view {
+    Column {
+      #if ios
+      Toggle("Haptics", isOn: bind(haptics))
+      #elseif macos
+      Button("Window", action: openWindow)
+      #endif
+      #if !visionos && debug
+      Text("debug")
+      #endif
+      Text(title)
+        #if visionos
+        .padding(20)
+        #endif
+      #if macos
+      MacOnly()
+      #endif
+    }
+  }
+}
+
+#if macos
+component MacOnly {
+  Text("mac")
+}
+#endif

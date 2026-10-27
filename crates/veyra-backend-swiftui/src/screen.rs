@@ -8,7 +8,7 @@ use veyra_ir::{ActionRef, LifecycleEvent, ScreenDef};
 
 use crate::swift::{self, ExprCx, ident};
 use crate::view::{self, ViewCx};
-use crate::{Di, Options, default_value, dependency_name, header, params};
+use crate::{Di, Options, default_value, dependency_name, guarded, header, params};
 
 pub(crate) fn state(s: &ScreenDef) -> String {
     let mut w = CodeWriter::new("    ");
@@ -21,22 +21,26 @@ pub(crate) fn state(s: &ScreenDef) -> String {
     w.line("@Observable");
     w.block(format!("final class {}State {{", s.name), "}", |w| {
         for f in &s.state {
-            w.line(format!(
-                "var {}: {} = {}",
-                ident(&f.name),
-                swift::ty(&f.ty),
-                default_value(&f.default)
-            ));
+            guarded(w, f.cond.as_ref(), |w| {
+                w.line(format!(
+                    "var {}: {} = {}",
+                    ident(&f.name),
+                    swift::ty(&f.ty),
+                    default_value(&f.default)
+                ))
+            });
         }
         if !s.computed.is_empty() {
             w.blank();
             for c in &s.computed {
                 let body = swift::expr(ExprCx { state: "" }, &c.expr);
-                w.line(format!(
-                    "var {}: {} {{ {body} }}",
-                    ident(&c.name),
-                    swift::ty(&c.ty)
-                ));
+                guarded(w, c.cond.as_ref(), |w| {
+                    w.line(format!(
+                        "var {}: {} {{ {body} }}",
+                        ident(&c.name),
+                        swift::ty(&c.ty)
+                    ))
+                });
             }
         }
         w.blank();
@@ -76,17 +80,19 @@ pub(crate) fn contract(s: &ScreenDef) -> String {
             if !setters.is_empty() {
                 w.blank();
                 for f in &setters {
-                    w.line(format!(
-                        "func {}(_ value: {})",
-                        ident(&f.setter_name().unwrap_or_default()),
-                        swift::ty(&f.ty)
-                    ));
+                    guarded(w, f.cond.as_ref(), |w| {
+                        w.line(format!(
+                            "func {}(_ value: {})",
+                            ident(&f.setter_name().unwrap_or_default()),
+                            swift::ty(&f.ty)
+                        ))
+                    });
                 }
             }
             if !s.actions.is_empty() {
                 w.blank();
                 for a in &s.actions {
-                    w.line(action_sig(a));
+                    guarded(w, a.cond.as_ref(), |w| w.line(action_sig(a)));
                 }
             }
         },
@@ -99,11 +105,13 @@ pub(crate) fn contract(s: &ScreenDef) -> String {
         ));
         w.block(format!("enum {}Effect: Sendable {{", s.name), "}", |w| {
             for e in &s.effects {
-                if e.params.is_empty() {
-                    w.line(format!("case {}", ident(&e.name)));
-                } else {
-                    w.line(format!("case {}({})", ident(&e.name), params(&e.params)));
-                }
+                guarded(w, e.cond.as_ref(), |w| {
+                    if e.params.is_empty() {
+                        w.line(format!("case {}", ident(&e.name)));
+                    } else {
+                        w.line(format!("case {}({})", ident(&e.name), params(&e.params)));
+                    }
+                });
             }
         });
         w.blank();
@@ -135,13 +143,15 @@ pub(crate) fn contract(s: &ScreenDef) -> String {
                         w.blank();
                     }
                     let setter = ident(&f.setter_name().unwrap_or_default());
-                    w.block(
-                        format!("func {setter}(_ value: {}) {{", swift::ty(&f.ty)),
-                        "}",
-                        |w| {
-                            w.line(format!("state.{} = value", ident(&f.name)));
-                        },
-                    );
+                    guarded(w, f.cond.as_ref(), |w| {
+                        w.block(
+                            format!("func {setter}(_ value: {}) {{", swift::ty(&f.ty)),
+                            "}",
+                            |w| {
+                                w.line(format!("state.{} = value", ident(&f.name)));
+                            },
+                        )
+                    });
                 }
             },
         );
@@ -336,8 +346,10 @@ pub(crate) fn view_model(s: &ScreenDef, options: &Options) -> String {
             }
             for a in &s.actions {
                 w.blank();
-                w.block(format!("{} {{", action_sig(a)), "}", |w| {
-                    w.line("// Implement business logic here");
+                guarded(w, a.cond.as_ref(), |w| {
+                    w.block(format!("{} {{", action_sig(a)), "}", |w| {
+                        w.line("// Implement business logic here");
+                    })
                 });
             }
         },

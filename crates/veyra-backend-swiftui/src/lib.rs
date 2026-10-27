@@ -25,7 +25,9 @@ use std::path::PathBuf;
 use serde::Deserialize;
 use veyra_codegen::{Backend, BackendInput, CodeWriter, GENERATED_NOTICE, OutputFile, camel_case};
 use veyra_diagnostics::{Diagnostic, Diagnostics};
-use veyra_ir::{ComponentParamType, IosModifier, ModifierKind, Platform, Program};
+use veyra_ir::{
+    AppleOs, ComponentParamType, IosModifier, ModifierKind, NativeCond, Platform, Program,
+};
 
 use crate::swift::ident;
 
@@ -53,6 +55,49 @@ pub struct Options {
     pub table: String,
     /// FactoryKit的模块名，旧版本为`Factory`
     pub factory_module: String,
+    /// 启用的Apple系统
+    pub platforms: Vec<String>,
+    /// 各系统的最低版本，例如`{ ios = "17.0" }`
+    pub deployment_targets: std::collections::BTreeMap<String, String>,
+}
+
+impl Options {
+    fn parse(table: &toml::Table) -> Result<Self, Diagnostics> {
+        let options: Options = table.clone().try_into().map_err(|e: toml::de::Error| {
+            Diagnostics::from(Diagnostic::error(
+                "V9001",
+                format!("[swiftui]配置无效：{}", e.message()),
+            ))
+        })?;
+        let mut diags = Diagnostics::new();
+        for name in options
+            .platforms
+            .iter()
+            .chain(options.deployment_targets.keys())
+        {
+            if AppleOs::from_cfg_name(name).is_none() {
+                diags.push(Diagnostic::error(
+                    "V9001",
+                    format!("[swiftui]中的`{name}`不是Apple系统，可用的系统：ios、macos、watchos、tvos、visionos"),
+                ));
+            }
+        }
+        if options.platforms.is_empty() {
+            diags.push(Diagnostic::error("V9001", "[swiftui]的platforms不能为空"));
+        }
+        if diags.has_errors() {
+            Err(diags)
+        } else {
+            Ok(options)
+        }
+    }
+
+    pub fn oses(&self) -> Vec<AppleOs> {
+        self.platforms
+            .iter()
+            .filter_map(|p| AppleOs::from_cfg_name(p))
+            .collect()
+    }
 }
 
 impl Default for Options {
@@ -63,6 +108,8 @@ impl Default for Options {
             di: Di::Manual,
             table: "Veyra".into(),
             factory_module: "FactoryKit".into(),
+            platforms: vec!["ios".into()],
+            deployment_targets: std::collections::BTreeMap::new(),
         }
     }
 }
@@ -75,20 +122,15 @@ impl Backend for SwiftUiBackend {
     }
 
     fn platform(&self) -> Platform {
-        Platform::Ios
+        Platform::Apple
+    }
+
+    fn apple_oses(&self, options: &toml::Table) -> Result<Vec<AppleOs>, Diagnostics> {
+        Ok(Options::parse(options)?.oses())
     }
 
     fn generate(&self, input: &BackendInput<'_>) -> Result<Vec<OutputFile>, Diagnostics> {
-        let options: Options = input
-            .options
-            .clone()
-            .try_into()
-            .map_err(|e: toml::de::Error| {
-                Diagnostics::from(Diagnostic::error(
-                    "V9001",
-                    format!("[swiftui]配置无效：{}", e.message()),
-                ))
-            })?;
+        let options = Options::parse(input.options)?;
         let mut files = Vec::new();
         let out = &options.out;
         let program = input.program;
@@ -180,16 +222,25 @@ impl Backend for SwiftUiBackend {
         for s in &program.screens {
             let dir = out.join("Screens").join(&s.name);
             let file = |suffix: &str| dir.join(format!("{}{suffix}.generated.swift", s.name));
-            files.push(OutputFile::generated(file("State"), screen::state(s)));
-            files.push(OutputFile::generated(file("Contract"), screen::contract(s)));
-            files.push(OutputFile::generated(file("View"), screen::view(s)));
+            files.push(OutputFile::generated(
+                file("State"),
+                guard_file(screen::state(s), s.cond.as_ref()),
+            ));
+            files.push(OutputFile::generated(
+                file("Contract"),
+                guard_file(screen::contract(s), s.cond.as_ref()),
+            ));
+            files.push(OutputFile::generated(
+                file("View"),
+                guard_file(screen::view(s), s.cond.as_ref()),
+            ));
             files.push(OutputFile::generated(
                 file("Root"),
-                screen::root(s, &options),
+                guard_file(screen::root(s, &options), s.cond.as_ref()),
             ));
             files.push(OutputFile::user_owned(
                 options.user_dir.join(format!("{}ViewModel.swift", s.name)),
-                screen::view_model(s, &options),
+                guard_file(screen::view_model(s, &options), s.cond.as_ref()),
             ));
         }
         Ok(files)
@@ -323,30 +374,32 @@ fn components(program: &Program) -> String {
     let mut w = CodeWriter::new("    ");
     header(&mut w, &["SwiftUI"]);
     for c in &program.components {
-        w.block(format!("struct {}: View {{", c.name), "}", |w| {
-            for p in &c.params {
-                match &p.ty {
-                    ComponentParamType::Value(t) => {
-                        w.line(format!("let {}: {}", ident(&p.name), swift::ty(t)))
-                    }
-                    ComponentParamType::Action => {
-                        w.line(format!("let {}: () -> Void", ident(&p.name)))
-                    }
-                    ComponentParamType::Binding(t) => {
-                        w.line(format!("@Binding var {}: {}", ident(&p.name), swift::ty(t)))
+        guarded(&mut w, c.cond.as_ref(), |w| {
+            w.block(format!("struct {}: View {{", c.name), "}", |w| {
+                for p in &c.params {
+                    match &p.ty {
+                        ComponentParamType::Value(t) => {
+                            w.line(format!("let {}: {}", ident(&p.name), swift::ty(t)))
+                        }
+                        ComponentParamType::Action => {
+                            w.line(format!("let {}: () -> Void", ident(&p.name)))
+                        }
+                        ComponentParamType::Binding(t) => {
+                            w.line(format!("@Binding var {}: {}", ident(&p.name), swift::ty(t)))
+                        }
                     }
                 }
-            }
-            if !c.params.is_empty() {
-                w.blank();
-            }
-            w.block("var body: some View {", "}", |w| {
-                let cx = view::ViewCx {
-                    expr: swift::ExprCx { state: "" },
-                    vm: "",
-                };
-                view::nodes(w, cx, &c.body);
-            });
+                if !c.params.is_empty() {
+                    w.blank();
+                }
+                w.block("var body: some View {", "}", |w| {
+                    let cx = view::ViewCx {
+                        expr: swift::ExprCx { state: "" },
+                        vm: "",
+                    };
+                    view::nodes(w, cx, &c.body);
+                });
+            })
         });
         w.blank();
     }
@@ -424,4 +477,31 @@ fn platform_support() -> String {
         });
     });
     w.finish()
+}
+
+/// 在原生条件内输出
+pub(crate) fn guarded(
+    w: &mut CodeWriter,
+    cond: Option<&NativeCond>,
+    body: impl FnOnce(&mut CodeWriter),
+) {
+    match cond {
+        Some(c) => {
+            w.line(format!("#if {}", c.swift()));
+            body(w);
+            w.line("#endif");
+        }
+        None => body(w),
+    }
+}
+
+/// 只在部分系统上存在的文件，把正文包进原生条件
+pub(crate) fn guard_file(contents: String, cond: Option<&NativeCond>) -> String {
+    let Some(cond) = cond else {
+        return contents;
+    };
+    match contents.split_once("\n\n") {
+        Some((notice, rest)) => format!("{notice}\n\n#if {}\n{rest}#endif\n", cond.swift()),
+        None => contents,
+    }
 }

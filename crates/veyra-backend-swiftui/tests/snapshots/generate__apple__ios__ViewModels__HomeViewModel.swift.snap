@@ -1,0 +1,22 @@
+---
+source: crates/veyra-backend-swiftui/tests/generate.rs
+expression: f.contents
+---
+// This file is created by Veyra and will not be overwritten
+
+import Foundation
+
+@MainActor
+final class HomeViewModel: HomeViewModelContract {
+    let state = HomeState()
+
+    #if os(macOS)
+    func openWindow() {
+        // Implement business logic here
+    }
+    #endif
+
+    func refresh() {
+        // Implement business logic here
+    }
+}

@@ -16,7 +16,7 @@ pub use writer::CodeWriter;
 use std::path::PathBuf;
 
 use veyra_diagnostics::Diagnostics;
-use veyra_ir::{Catalog, Platform, Program};
+use veyra_ir::{AppleOs, Catalog, Platform, Program};
 
 /// 生成文件的归属
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -70,6 +70,12 @@ pub trait Backend {
     fn platform(&self) -> Platform;
 
     fn generate(&self, input: &BackendInput<'_>) -> Result<Vec<OutputFile>, Diagnostics>;
+
+    /// 启用的Apple系统，非Apple后端返回空列表
+    fn apple_oses(&self, options: &toml::Table) -> Result<Vec<AppleOs>, Diagnostics> {
+        let _ = options;
+        Ok(Vec::new())
+    }
 }
 
 /// 生成文件头部的说明
