@@ -11,6 +11,7 @@ members = [
     "crates/veyra-l10n",
     "crates/veyra-project",
     "crates/veyra-cli",
+    "crates/veyra-catalog",
 ]
 
 [workspace.package]
@@ -32,6 +33,7 @@ veyra-backend-swiftui = { path = "crates/veyra-backend-swiftui" }
 veyra-backend-compose = { path = "crates/veyra-backend-compose" }
 veyra-l10n = { path = "crates/veyra-l10n" }
 veyra-project = { path = "crates/veyra-project" }
+veyra-catalog = { path = "crates/veyra-catalog" }
 
 clap = { version = "4", features = ["derive"] }
 indexmap = { version = "2", features = ["serde"] }

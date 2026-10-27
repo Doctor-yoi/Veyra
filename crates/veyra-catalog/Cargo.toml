@@ -1,0 +1,21 @@
+[package]
+name = "veyra-catalog"
+description = "从Apple SDK生成并读取SwiftUI API目录"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license-file.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[[bin]]
+name = "veyra-catalog"
+path = "src/bin/veyra-catalog.rs"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true
