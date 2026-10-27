@@ -1,0 +1,51 @@
+model Photo {
+  id: String
+  title: String
+}
+
+screen Gallery {
+  state {
+    photos: List<Photo> = []
+    query: String = "" @writable
+    showDetails: Bool = false @writable
+    loading: Bool = false
+  }
+
+  actions {
+    reload() async
+  }
+
+  view {
+    Column {
+      LazyGrid(photos, key: .id, minWidth: 120, spacing: 8) { photo in
+        Text(photo.title)
+      }
+      .refreshable(reload, isRefreshing: loading)
+      .searchable(text: bind(query), prompt: "搜索")
+      LazyRow(photos, key: .id, spacing: 4) { photo in
+        Text(photo.title)
+      }
+      LazyColumn(photos, key: .id) { photo in
+        Text(photo.title)
+      }
+      ScrollView(axis: .horizontal, indicators: false) {
+        Text("a")
+        Text("b")
+      }
+      Form {
+        Section(header: "基本", footer: "说明") {
+          Toggle("详情", isOn: bind(showDetails))
+        }
+        GroupBox("分组") {
+          Text("内容")
+        }
+        DisclosureGroup("更多", isExpanded: bind(showDetails)) {
+          Text("展开内容")
+        }
+        DisclosureGroup("其他") {
+          Text("本地状态")
+        }
+      }
+    }
+  }
+}
