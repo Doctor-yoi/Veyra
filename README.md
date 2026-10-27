@@ -60,6 +60,8 @@ veyra build
 
 ## Language
 
+The complete grammar, built-in components, modifiers and rules are described in the [syntax reference](docs/syntax.md).
+
 Every interaction in a view falls into one of three forms, and the compiler checks each before any platform code is generated:
 
 | Form | Syntax | Rule |
