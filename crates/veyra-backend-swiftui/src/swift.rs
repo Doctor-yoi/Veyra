@@ -143,6 +143,11 @@ pub(crate) fn expr(cx: ExprCx, e: &Expr) -> String {
     emit(cx, e).0
 }
 
+/// 后缀调用前的表达式，例如`x.map`中的`x`
+pub(crate) fn postfix(cx: ExprCx, e: &Expr) -> String {
+    wrap(cx, e, ATOM)
+}
+
 fn wrap(cx: ExprCx, e: &Expr, min: u8) -> String {
     let (s, p) = emit(cx, e);
     if p < min { format!("({s})") } else { s }

@@ -212,20 +212,27 @@ fn compile(dir: &Path, args: &BuildArgs, r: &mut Reporter) -> Option<Compiled> {
         let analysis = analyze(&asts, &target);
         // 多个Apple系统时，IR保留系统差异，诊断由逐个系统的检查给出
         let diagnostics = if target.apple_oses.len() > 1 {
-            // 条件结构本身的问题只在保留系统差异时才能发现
-            let mut all = Diagnostics::new();
-            for d in analysis.diagnostics {
-                if d.code.starts_with("V60") {
-                    all.push(d);
-                }
-            }
+            let mut per_os = Diagnostics::new();
             for os in &target.apple_oses {
                 let single = Target {
                     os: Some(*os),
                     ..target.clone()
                 };
-                all.extend(analyze(&asts, &single).diagnostics);
+                per_os.extend(analyze(&asts, &single).diagnostics);
             }
+            // 条件结构本身的问题只在保留系统差异时才能发现
+            // 互斥系统分支中的同名声明在单个系统上合法，但生成的代码只能保留一份
+            let mut all = Diagnostics::new();
+            for d in analysis.diagnostics {
+                if d.code.starts_with("V60") {
+                    all.push(d);
+                } else if matches!(d.code, "V1001" | "V1003") && !per_os.iter().any(|x| *x == d) {
+                    all.push(d.with_note(
+                        "启用多个Apple系统时，按系统区分的声明也不能重名，请合并为一个声明并在view中用#if区分",
+                    ));
+                }
+            }
+            all.extend(per_os);
             all
         } else {
             analysis.diagnostics

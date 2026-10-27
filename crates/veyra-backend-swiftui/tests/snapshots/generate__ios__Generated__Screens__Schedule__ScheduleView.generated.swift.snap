@@ -51,6 +51,7 @@ struct ScheduleView<ViewModel: ScheduleViewModelContract>: View {
                     .foregroundStyle(.tint)
                     .refreshable(action: { await viewModel.refresh() })
                     .navigationTitle(L10n.scheduleTitle)
+                    .frame(width: viewModel.state.cardWidth.map { .init($0) })
                 Text(verbatim: "tag")
                     #if DEBUG
                     .padding(4.0)
