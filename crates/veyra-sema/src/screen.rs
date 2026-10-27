@@ -228,7 +228,16 @@ impl<'a> Checker<'a> {
                         });
                     }
                 }
-                ScreenMember::Lifecycle(block) => hooks.extend(self.prune_decls(&block.items)),
+                ScreenMember::Lifecycle(block) => {
+                    if mcond.is_some() {
+                        self.diags.push(
+                            Diagnostic::error("V6005", "lifecycle块不能按Apple系统区分")
+                                .with_label(block.keyword, "")
+                                .with_note("请在action的实现中按系统处理"),
+                        );
+                    }
+                    hooks.extend(self.prune_decls(&block.items))
+                }
                 ScreenMember::View(block) => {
                     if mcond.is_some() {
                         self.diags.push(
