@@ -117,7 +117,12 @@ Every store provides `all`, `find`, `save` and `delete`, plus the declared queri
 
 `settings` generates typed preferences backed by `UserDefaults` and DataStore, and every field needs a default value. `secure` generates credential storage backed by the Keychain on iOS and by values encrypted with an Android Keystore key on Android, without third-party libraries. Both are injected into view models like repositories and stores.
 
-Conditional compilation selects platform-specific content. Platform conditions and custom flags declared in `[flags]` are resolved at compile time, and each platform is type checked separately:
+Conditional compilation selects platform-specific content. `apple`, `android` and custom flags declared in `[flags]` are resolved at compile time. The SwiftUI backend emits a single Swift code base for every system listed in `[swiftui] platforms`, so `ios`, `macos`, `watchos`, `tvos` and `visionos` are kept as `#if os(...)` in the generated code, and each system is type checked separately:
+
+```toml
+[swiftui]
+platforms = ["ios", "macos", "visionos"]
+```
 
 ```
 state {
@@ -127,13 +132,15 @@ state {
 }
 ```
 
-`debug` is kept in the native code as `#if DEBUG` on iOS and `BuildConfig.DEBUG` on Android, so it can only guard views and modifiers. Android projects need `buildFeatures.buildConfig = true`. Inside a platform block, platform-only components and modifiers are available, such as `ios.ShareLink`, `.ios.glassEffect()`, `android.FloatingActionButton` and `.android.imePadding()`. As a last resort, `native ios { """...""" }` emits code verbatim, with `{{name}}` replaced by state reads or action entry points. Native blocks bypass type checking, so they produce a warning that `[lint] native` can turn off or into an error.
+System conditions may guard screens, components, their members, views and modifiers. `debug` is kept as `#if DEBUG` on Apple systems and `BuildConfig.DEBUG` on Android, so it can only guard views and modifiers. Android projects need `buildFeatures.buildConfig = true`.
+
+Framework-specific components and modifiers live under `swiftui.*` and `compose.*`, such as `swiftui.ShareLink`, `.swiftui.glassEffect()`, `compose.FloatingActionButton` and `.compose.imePadding()`, and must be used inside `#if apple` or `#if android`. As a last resort, `native swiftui { """...""" }` emits code verbatim, with `{{name}}` replaced by state reads or action entry points. Native blocks bypass type checking, so they produce a warning that `[lint] native` can turn off or into an error.
 
 ```
-#if ios
-Text(title).ios.glassEffect()
+#if apple
+Text(title).swiftui.glassEffect()
 #elseif android
-android.FloatingActionButton("+", action: add)
+compose.FloatingActionButton("+", action: add)
 #endif
 #if debug
 Text(buildInfo)

@@ -117,7 +117,12 @@ store NoteStore for Note {
 
 `settings`生成基于`UserDefaults`与DataStore的类型安全配置，每个字段都需要默认值。`secure`生成凭证存储，iOS使用Keychain，Android使用Android Keystore密钥加密后保存，不依赖第三方库。两者与repository、store一样注入到ViewModel中。
 
-条件编译用于选择平台专属内容。平台条件与`[flags]`中声明的自定义flag在编译期确定，每个平台单独做类型检查：
+条件编译用于选择平台专属内容。`apple`、`android`与`[flags]`中声明的自定义flag在编译期确定。SwiftUI后端为`[swiftui] platforms`中的所有系统生成同一套Swift代码，因此`ios`、`macos`、`watchos`、`tvos`与`visionos`会保留为生成代码中的`#if os(...)`，并对每个系统分别做类型检查：
+
+```toml
+[swiftui]
+platforms = ["ios", "macos", "visionos"]
+```
 
 ```
 state {
@@ -127,13 +132,15 @@ state {
 }
 ```
 
-`debug`会保留到原生代码中，iOS为`#if DEBUG`，Android为`BuildConfig.DEBUG`，因此只能用于视图与修饰符，Android工程需要开启`buildFeatures.buildConfig = true`。在平台条件块中可以使用平台专属的组件与修饰符，例如`ios.ShareLink`、`.ios.glassEffect()`、`android.FloatingActionButton`与`.android.imePadding()`。如果仍不够用，可以用`native ios { """...""" }`原样输出代码，其中`{{name}}`会替换为状态读取或action入口。native代码块不受类型检查，编译时会给出警告，可通过`[lint] native`关闭或升级为错误。
+系统条件可以用于screen、component及其成员、视图与修饰符。`debug`在Apple系统上保留为`#if DEBUG`，在Android上为`BuildConfig.DEBUG`，因此只能用于视图与修饰符，Android工程需要开启`buildFeatures.buildConfig = true`。
+
+框架专属的组件与修饰符位于`swiftui.*`与`compose.*`下，例如`swiftui.ShareLink`、`.swiftui.glassEffect()`、`compose.FloatingActionButton`与`.compose.imePadding()`，需要放在`#if apple`或`#if android`中使用。如果仍不够用，可以用`native swiftui { """...""" }`原样输出代码，其中`{{name}}`会替换为状态读取或action入口。native代码块不受类型检查，编译时会给出警告，可通过`[lint] native`关闭或升级为错误。
 
 ```
-#if ios
-Text(title).ios.glassEffect()
+#if apple
+Text(title).swiftui.glassEffect()
 #elseif android
-android.FloatingActionButton("+", action: add)
+compose.FloatingActionButton("+", action: add)
 #endif
 #if debug
 Text(buildInfo)

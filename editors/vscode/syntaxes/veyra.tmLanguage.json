@@ -40,7 +40,7 @@
         "1": { "name": "keyword.control.directive.veyra" },
         "2": {
           "patterns": [
-            { "match": "\\b(ios|android|harmony|debug)\\b", "name": "constant.language.platform.veyra" },
+            { "match": "\\b(apple|android|harmony|ios|macos|watchos|tvos|visionos|debug)\\b", "name": "constant.language.platform.veyra" },
             { "match": "&&|\\|\\||!", "name": "keyword.operator.logical.veyra" },
             { "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b", "name": "variable.other.flag.veyra" }
           ]
@@ -48,7 +48,7 @@
       }
     },
     "native": {
-      "begin": "\\b(native)\\s+(ios|android|harmony)\\s*(\\{)\\s*(\"\"\")",
+      "begin": "\\b(native)\\s+(swiftui|compose)\\s*(\\{)\\s*(\"\"\")",
       "beginCaptures": {
         "1": { "name": "keyword.other.native.veyra" },
         "2": { "name": "constant.language.platform.veyra" },
@@ -152,14 +152,14 @@
       "name": "support.function.builtin.veyra"
     },
     "modifiers": {
-      "match": "(?<=[)}\\s])\\.(?:(ios|android)\\.)?([A-Za-z_][A-Za-z0-9_]*)(?=\\s*\\()",
+      "match": "(?<=[)}\\s])\\.(?:(swiftui|compose)\\.)?([A-Za-z_][A-Za-z0-9_]*)(?=\\s*\\()",
       "captures": {
         "1": { "name": "support.namespace.platform.veyra" },
         "2": { "name": "entity.name.function.modifier.veyra" }
       }
     },
     "platform": {
-      "match": "\\b(ios|android)\\.([A-Z][A-Za-z0-9_]*)",
+      "match": "\\b(swiftui|compose)\\.([A-Z][A-Za-z0-9_]*)",
       "captures": {
         "1": { "name": "support.namespace.platform.veyra" },
         "2": { "name": "support.class.component.veyra" }
