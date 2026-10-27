@@ -45,7 +45,7 @@ error[V2044]: `Font`没有成员`.giant`
    |
    = note: 可用取值：.body、.callout、.caption、.caption2、.custom、.default、.extraLargeTitle、.extraLargeTitle2、.footnote、.headline、.largeTitle、.subheadline、.system、.title、.title2、.title3
 
-error[V2001]: 类型不匹配：期望`Double`，实际为`String`
+error[V2001]: 类型不匹配：期望`Double?`，实际为`String`
   --> err_swiftui.vey:18:39
    |
 18 |       Text("x").swiftui.padding(.all, "8")

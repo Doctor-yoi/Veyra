@@ -266,7 +266,23 @@ impl<'a> Checker<'a> {
                         SwiftConv::None,
                     ));
                 }
-                return self.framework_value(sc, inner, e);
+                // 可选参数也接受可选值，文本与其他类型按非可选参数检查
+                let Some(t) = base_type(inner).filter(|_| !matches!(**inner, ParamType::Text(_)))
+                else {
+                    return self.framework_value(sc, inner, e);
+                };
+                let mut v = self.expr(sc, e, Some(&Type::optional(t.clone())));
+                if t == Type::Double {
+                    v = crate::expr::promote(v);
+                }
+                let conv = match (&**inner, v.ty.is_optional()) {
+                    (ParamType::Double | ParamType::Float, true) => SwiftConv::OptionalNumber,
+                    (ParamType::Url, true) => SwiftConv::OptionalUrl,
+                    (ParamType::Float, false) => SwiftConv::Float,
+                    (ParamType::Url, false) => SwiftConv::Url,
+                    _ => SwiftConv::None,
+                };
+                FrameworkValue::Expr(v, conv)
             }
             ParamType::Bool | ParamType::Int | ParamType::String | ParamType::Date => {
                 let t = base_type(ty).unwrap_or(Type::Unknown);

@@ -362,6 +362,9 @@ pub enum SwiftConv {
     LocalizedKey,
     Float,
     Url,
+    /// 可选数值，转换为参数的浮点类型，例如`CGFloat?`
+    OptionalNumber,
+    OptionalUrl,
 }
 
 #[derive(Clone, Debug, PartialEq)]

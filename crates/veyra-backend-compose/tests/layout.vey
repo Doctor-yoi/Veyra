@@ -28,6 +28,9 @@ screen Gallery {
       LazyColumn(photos, key: .id) { photo in
         Text(photo.title)
       }
+      #if debug
+      .refreshable(reload)
+      #endif
       ScrollView(axis: .horizontal, indicators: false) {
         Text("a")
         Text("b")

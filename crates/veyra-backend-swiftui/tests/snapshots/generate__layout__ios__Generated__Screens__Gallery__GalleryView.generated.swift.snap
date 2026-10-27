@@ -12,7 +12,7 @@ struct GalleryView<ViewModel: GalleryViewModelContract>: View {
     var body: some View {
         VStack {
             ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 120.0))], spacing: 8.0) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 120.0), spacing: 8.0)], spacing: 8.0) {
                     ForEach(viewModel.state.photos, id: \.id) { photo in
                         Text(photo.title)
                     }
@@ -34,6 +34,9 @@ struct GalleryView<ViewModel: GalleryViewModelContract>: View {
                     }
                 }
             }
+            #if DEBUG
+            .refreshable { await viewModel.reload() }
+            #endif
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack {
                     Text(verbatim: "a")

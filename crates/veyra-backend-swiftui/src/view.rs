@@ -261,21 +261,26 @@ fn element(w: &mut CodeWriter, cx: ViewCx, el: &Element) {
                     ),
                 ),
                 _ => {
+                    // 列间距在GridItem上，行间距在LazyVGrid上
+                    let item_spacing = spacing
+                        .as_ref()
+                        .map(|s| format!(", spacing: {s}"))
+                        .unwrap_or_default();
                     let columns = match (
                         arg("minWidth").and_then(Value::as_expr),
                         arg("columns").and_then(Value::as_expr),
                     ) {
                         (Some(min), _) => format!(
-                            "[GridItem(.adaptive(minimum: {}))]",
+                            "[GridItem(.adaptive(minimum: {}){item_spacing})]",
                             swift::expr(cx.expr, min)
                         ),
                         (None, Some(n)) => format!(
-                            "Array(repeating: GridItem(.flexible()), count: {})",
+                            "Array(repeating: GridItem(.flexible(){item_spacing}), count: {})",
                             swift::expr(cx.expr, n)
                         ),
-                        (None, None) => {
-                            "Array(repeating: GridItem(.flexible()), count: 2)".to_string()
-                        }
+                        (None, None) => format!(
+                            "Array(repeating: GridItem(.flexible(){item_spacing}), count: 2)"
+                        ),
                     };
                     let spacing = spacing
                         .as_ref()
@@ -815,6 +820,11 @@ fn conv(cx: ViewCx, e: &Expr, c: SwiftConv) -> String {
         SwiftConv::LocalizedKey => format!("LocalizedStringKey({})", swift::expr(cx.expr, e)),
         SwiftConv::Float => format!("Float({})", swift::expr(cx.expr, e)),
         SwiftConv::Url => format!("URL(string: {})!", swift::expr(cx.expr, e)),
+        SwiftConv::OptionalNumber => format!("{}.map {{ .init($0) }}", swift::postfix(cx.expr, e)),
+        SwiftConv::OptionalUrl => format!(
+            "{}.flatMap {{ URL(string: $0) }}",
+            swift::postfix(cx.expr, e)
+        ),
     }
 }
 

@@ -30,11 +30,11 @@ for os in $platforms; do
     watchos) sdk=watchsimulator; target="$arch-apple-watchos10.0-simulator" ;;
     tvos) sdk=appletvsimulator; target="$arch-apple-tvos17.0-simulator" ;;
     visionos) sdk=xrsimulator; target="$arch-apple-xros1.0-simulator" ;;
-    *) echo "未知的系统：$os" >&2; exit 1 ;;
+    *) echo "未知的系统：${os}" >&2; exit 1 ;;
   esac
   # 运行环境没有安装对应平台时跳过
   if ! sdk_path="$(xcrun --sdk "$sdk" --show-sdk-path 2>/dev/null)"; then
-    echo "跳过$os：未安装$sdk SDK"
+    echo "跳过${os}：未安装${sdk} SDK"
     continue
   fi
   xcrun swiftc -typecheck \
@@ -43,5 +43,5 @@ for os in $platforms; do
     -swift-version 6 \
     -parse-as-library \
     "${files[@]}"
-  echo "Swift类型检查通过：$os，${#files[@]}个文件"
+  echo "Swift类型检查通过：${os}，${#files[@]}个文件"
 done
