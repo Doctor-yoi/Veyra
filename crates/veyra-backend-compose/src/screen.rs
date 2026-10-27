@@ -211,6 +211,7 @@ pub(crate) fn content(s: &ScreenDef, o: &Options) -> String {
         actions: "actions",
         im: &mut im,
         temp: 0,
+        menu: None,
     };
     // 外部传入的modifier作用于唯一的根节点
     match s.view.as_slice() {

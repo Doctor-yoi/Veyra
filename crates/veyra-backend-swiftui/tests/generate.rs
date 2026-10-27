@@ -3,7 +3,7 @@
 
 use veyra_backend_swiftui::SwiftUiBackend;
 use veyra_codegen::{Backend, BackendInput};
-use veyra_ir::{Catalog, CatalogEntry, Platform, Translation};
+use veyra_ir::{AppleOs, Catalog, CatalogEntry, Platform, Translation};
 use veyra_sema::{Target, analyze};
 
 #[test]
@@ -222,6 +222,48 @@ fn generates_layout() {
         let name = f.path.to_string_lossy().replace('/', "__");
         if name.contains("Content") || name.contains("View.generated") {
             insta::assert_snapshot!(format!("layout__{name}"), f.contents);
+        }
+    }
+}
+
+#[test]
+fn generates_controls() {
+    let src = include_str!("controls.vey");
+    let parsed = veyra_syntax::parse(Default::default(), src);
+    assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
+    let mut target = Target::new(Platform::Apple);
+    target.apple_oses = vec![AppleOs::Ios, AppleOs::Macos, AppleOs::Visionos];
+    let analysis = analyze(&[parsed.file], &target);
+    assert!(
+        !analysis.diagnostics.has_errors(),
+        "{:?}",
+        analysis.diagnostics
+    );
+    let catalog = Catalog {
+        source_locale: "en".into(),
+        target_locales: Vec::new(),
+        entries: Vec::new(),
+    };
+    let options: toml::Table =
+        toml::from_str("platforms = [\"ios\", \"macos\", \"visionos\"]").unwrap();
+    let files = SwiftUiBackend
+        .generate(&BackendInput {
+            program: &analysis.program,
+            catalog: &catalog,
+            options: &options,
+        })
+        .unwrap();
+    if let Ok(dir) = std::env::var("VEYRA_DUMP_CONTROLS") {
+        for f in &files {
+            let path = std::path::Path::new(&dir).join(&f.path);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, &f.contents).unwrap();
+        }
+    }
+    for f in files {
+        let name = f.path.to_string_lossy().replace('/', "__");
+        if name.contains("Content") || name.contains("View.generated") {
+            insta::assert_snapshot!(format!("controls__{name}"), f.contents);
         }
     }
 }

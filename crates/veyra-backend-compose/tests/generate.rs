@@ -175,3 +175,45 @@ fn generates_layout() {
         }
     }
 }
+
+#[test]
+fn generates_controls() {
+    let src = include_str!("controls.vey");
+    let parsed = veyra_syntax::parse(Default::default(), src);
+    assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
+    let analysis = analyze(&[parsed.file], &Target::new(Platform::Android));
+    assert!(
+        !analysis.diagnostics.has_errors(),
+        "{:?}",
+        analysis.diagnostics
+    );
+    let catalog = Catalog {
+        source_locale: "en".into(),
+        target_locales: Vec::new(),
+        entries: Vec::new(),
+    };
+    let options: toml::Table = toml::from_str("package = \"com.example.settings\"").unwrap();
+    let files = ComposeBackend
+        .generate(&BackendInput {
+            program: &analysis.program,
+            catalog: &catalog,
+            options: &options,
+        })
+        .unwrap();
+    if let Ok(dir) = std::env::var("VEYRA_DUMP_CONTROLS") {
+        for f in &files {
+            let path = std::path::Path::new(&dir).join(&f.path);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, &f.contents).unwrap();
+        }
+    }
+    for f in files {
+        let name = f.path.to_string_lossy().replace('/', "__");
+        if name.contains("Content")
+            || name.contains("View.generated")
+            || name.contains("VeyraControls")
+        {
+            insta::assert_snapshot!(format!("controls__{name}"), f.contents);
+        }
+    }
+}

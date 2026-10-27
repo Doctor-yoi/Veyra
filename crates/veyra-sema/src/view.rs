@@ -5,10 +5,13 @@
 
 use indexmap::IndexMap;
 use veyra_diagnostics::{Diagnostic, Span};
-use veyra_ir::{self as ir, Builtin, ComponentParamType, ElementKind, ModifierKind, Type, Value};
+use veyra_ir::{
+    self as ir, AppleOs, Builtin, ComponentParamType, ElementKind, ModifierKind, Type, Value,
+};
 use veyra_syntax::ast::{self, Arg, ExprKind as A};
 
 use crate::catalog::{self, ArgKind, ArgSpec, Children};
+use crate::cfg::and_cond;
 use crate::expr::{Scope, promote};
 use crate::{Checker, NativeLint};
 
@@ -91,9 +94,29 @@ impl<'a> Checker<'a> {
             );
             return None;
         };
-        let spec = catalog::element(builtin);
+        let mut spec = catalog::element(builtin);
         let what = format!("组件`{}`", name.name);
-        let args = self.match_args(sc, &spec.args, &el.args, name.span, &what);
+        let picker = sc.picker.take();
+        if builtin == Builtin::Option {
+            match &picker {
+                Some(t) => spec.args[1].kind = ArgKind::Expr(t.clone()),
+                None => self.error("V2045", "`Option`只能用于`Picker`中", name.span, ""),
+            }
+        }
+        let mut args = self.match_args(sc, &spec.args, &el.args, name.span, &what);
+        self.check_builtin_availability(sc, builtin, &args, name.span);
+        let selection = match builtin {
+            Builtin::Picker => Some(self.picker_selection(&args, el)),
+            Builtin::Stepper => {
+                self.check_stepper(&mut args, el);
+                None
+            }
+            _ => None,
+        };
+        sc.picker = match builtin {
+            Builtin::ForEach => picker.clone(),
+            _ => selection,
+        };
 
         // 列表元素类型与key
         let mut item = None;
@@ -162,6 +185,15 @@ impl<'a> Checker<'a> {
             }
             (None, Children::None) => Vec::new(),
         };
+
+        sc.picker = picker;
+        if builtin == Builtin::Picker && !children.iter().all(is_option) {
+            self.diags.push(
+                Diagnostic::error("V2047", "`Picker`的内容只能是`Option`")
+                    .with_label(el.closure.as_ref().map(|c| c.span).unwrap_or(el.span), "")
+                    .with_note("动态选项写成`ForEach(items, key: .id) { item in Option(...) }`"),
+            );
+        }
 
         let modifiers = self.modifiers(sc, &el.modifiers, Some(builtin));
         Some(ir::Element {
@@ -459,6 +491,65 @@ impl<'a> Checker<'a> {
         Some(ir::NativeSegment::Expr(v))
     }
 
+    /// 实参的位置，找不到时退回组件本身
+    fn arg_span(el: &ast::Element, label: &str) -> Span {
+        el.args
+            .iter()
+            .find(|a| a.label.as_ref().is_some_and(|l| l.name == label))
+            .map(|a| a.value.span)
+            .unwrap_or(el.span)
+    }
+
+    /// Picker的selection类型，Option的value需与之一致
+    fn picker_selection(&mut self, args: &IndexMap<String, Value>, el: &ast::Element) -> Type {
+        let ty = match args.get("selection").and_then(Value::as_binding) {
+            Some(ir::BindingRef::State { ty, .. } | ir::BindingRef::Param { ty, .. }) => ty.clone(),
+            None => return Type::Unknown,
+        };
+        let ok = matches!(
+            ty.unwrap_optional(),
+            Type::Int | Type::String | Type::Bool | Type::Enum(_) | Type::Unknown
+        );
+        if !ok {
+            self.error(
+                "V2046",
+                format!("`Picker`的selection不能是`{ty}`"),
+                Self::arg_span(el, "selection"),
+                "可用类型：Int、String、Bool、enum及其可选类型",
+            );
+        }
+        ty
+    }
+
+    /// Stepper的取值范围与步长需与绑定的数值类型一致
+    fn check_stepper(&mut self, args: &mut IndexMap<String, Value>, el: &ast::Element) {
+        let ty = match args.get("value").and_then(Value::as_binding) {
+            Some(ir::BindingRef::State { ty, .. } | ir::BindingRef::Param { ty, .. }) => ty.clone(),
+            None => return,
+        };
+        if !matches!(ty, Type::Int | Type::Double) {
+            self.error(
+                "V2046",
+                format!("`Stepper`的value不能是`{ty}`"),
+                Self::arg_span(el, "value"),
+                "可用类型：Int、Double",
+            );
+            return;
+        }
+        for name in ["min", "max", "step"] {
+            let Some(Value::Expr(x)) = args.get_mut(name) else {
+                continue;
+            };
+            if ty == Type::Double {
+                *x = promote(x.clone());
+            }
+            if !ty.accepts(&x.ty) {
+                let found = x.ty.clone();
+                self.mismatch(Self::arg_span(el, name), &ty, &found);
+            }
+        }
+    }
+
     fn check_key_path(&mut self, elem: &Type, key: &str, el: &ast::Element) {
         let span = el
             .args
@@ -571,10 +662,26 @@ impl<'a> Checker<'a> {
                 );
                 continue;
             }
+            // 键盘相关的修饰符只存在于部分系统，其余系统上直接忽略
+            let only = match kind {
+                ModifierKind::Keyboard => {
+                    self.os_restriction(&[AppleOs::Ios, AppleOs::Tvos, AppleOs::Visionos])
+                }
+                ModifierKind::Autocapitalization => self.os_restriction(&[
+                    AppleOs::Ios,
+                    AppleOs::Tvos,
+                    AppleOs::Visionos,
+                    AppleOs::Watchos,
+                ]),
+                _ => Some(None),
+            };
+            let Some(only) = only else {
+                continue;
+            };
             out.push(ir::Modifier {
                 kind,
                 args,
-                cond: p.cond.clone(),
+                cond: and_cond(p.cond.clone(), only),
                 call: None,
             });
         }
@@ -706,6 +813,20 @@ impl<'a> Checker<'a> {
                 _ => Value::Expr(promote(self.expr(sc, e, Some(&Type::Double)))),
             },
         }
+    }
+}
+
+/// Picker的内容：Option，或内容全为Option的ForEach
+fn is_option(node: &ir::ViewNode) -> bool {
+    match node {
+        ir::ViewNode::Element(el) => match el.kind {
+            ElementKind::Builtin(Builtin::Option) => true,
+            ElementKind::Builtin(Builtin::ForEach) => el.children.iter().all(|c| {
+                matches!(c, ir::ViewNode::Element(e) if e.kind == ElementKind::Builtin(Builtin::Option))
+            }),
+            _ => false,
+        },
+        _ => false,
     }
 }
 

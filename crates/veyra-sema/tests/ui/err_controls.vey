@@ -1,0 +1,32 @@
+enum Mode {
+  light
+  dark
+}
+
+screen Controls {
+  state {
+    mode: Mode = .light @writable
+    ratio: Double = 0.5 @writable
+    count: Int = 0 @writable
+    name: String = "" @writable
+  }
+
+  view {
+    Column {
+      Picker("模式", selection: bind(mode)) {
+        Option("浅色", value: .light)
+        Option("错误", value: "dark")
+        Text("不是选项")
+      }
+      Picker("比例", selection: bind(ratio)) {
+        Option("一半", value: 0.5)
+      }
+      Option("孤立", value: 1)
+      Stepper("名称", value: bind(name))
+      Stepper("数量", value: bind(count), max: 1.5)
+      Text("x").keyboard(.email)
+      TextField("名称", text: bind(name)).keyboard(.qwerty)
+      DatePicker("日期", selection: bind(name))
+    }
+  }
+}

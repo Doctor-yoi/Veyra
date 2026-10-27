@@ -111,6 +111,24 @@ pub(crate) const COLORS: &[&str] = &[
     "clear",
 ];
 
+pub(crate) const PICKER_STYLES: &[&str] = &[
+    "automatic",
+    "menu",
+    "segmented",
+    "inline",
+    "wheel",
+    "palette",
+];
+pub(crate) const DATE_COMPONENTS: &[&str] = &["date", "time", "dateTime"];
+pub(crate) const DATE_STYLES: &[&str] = &["automatic", "compact", "graphical", "wheel"];
+pub(crate) const PROGRESS_STYLES: &[&str] = &["linear", "circular"];
+pub(crate) const BUTTON_ROLES: &[&str] = &["destructive", "cancel"];
+pub(crate) const KEYBOARDS: &[&str] = &["default", "email", "number", "decimal", "phone", "url"];
+pub(crate) const SUBMIT_LABELS: &[&str] = &[
+    "done", "go", "next", "search", "send", "return", "continue", "join", "route",
+];
+pub(crate) const CAPITALIZATION: &[&str] = &["never", "words", "sentences", "characters"];
+
 pub(crate) fn element(builtin: Builtin) -> ElementSpec {
     use ArgKind::*;
     let (args, children) = match builtin {
@@ -131,7 +149,14 @@ pub(crate) fn element(builtin: Builtin) -> ElementSpec {
             Children::Required,
         ),
         Builtin::Text => (vec![req("_", Text)], Children::None),
-        Builtin::Button => (vec![req("_", Text), req("action", Action)], Children::None),
+        Builtin::Button => (
+            vec![
+                req("_", Text),
+                opt("role", Token(BUTTON_ROLES)),
+                req("action", Action),
+            ],
+            Children::None,
+        ),
         Builtin::TextField | Builtin::SecureField => (
             vec![req("_", Text), req("text", Binding(Type::String))],
             Children::None,
@@ -150,7 +175,15 @@ pub(crate) fn element(builtin: Builtin) -> ElementSpec {
         ),
         Builtin::Image => (vec![req("_", Expr(Type::String))], Children::None),
         Builtin::Spacer | Builtin::Divider => (vec![], Children::None),
-        Builtin::Progress => (vec![opt("value", Number)], Children::None),
+        Builtin::Progress => (
+            vec![
+                opt("_", Text),
+                opt("value", Number),
+                opt("total", Number),
+                opt("style", Token(PROGRESS_STYLES)),
+            ],
+            Children::None,
+        ),
         Builtin::List | Builtin::ForEach => {
             (vec![req("_", List), req("key", KeyPath)], Children::Item)
         }
@@ -178,6 +211,57 @@ pub(crate) fn element(builtin: Builtin) -> ElementSpec {
             vec![req("_", Text), opt("isExpanded", Binding(Type::Bool))],
             Children::Required,
         ),
+        // selection与value的类型在检查时确定
+        Builtin::Picker => (
+            vec![
+                req("_", Text),
+                req("selection", Binding(Type::Unknown)),
+                opt("style", Token(PICKER_STYLES)),
+            ],
+            Children::Required,
+        ),
+        Builtin::Option => (
+            vec![req("_", Text), req("value", Expr(Type::Unknown))],
+            Children::None,
+        ),
+        Builtin::DatePicker => (
+            vec![
+                req("_", Text),
+                req("selection", Binding(Type::Date)),
+                opt("components", Token(DATE_COMPONENTS)),
+                opt("style", Token(DATE_STYLES)),
+            ],
+            Children::None,
+        ),
+        Builtin::Stepper => (
+            vec![
+                req("_", Text),
+                req("value", Binding(Type::Unknown)),
+                opt("min", Expr(Type::Unknown)),
+                opt("max", Expr(Type::Unknown)),
+                opt("step", Expr(Type::Unknown)),
+            ],
+            Children::None,
+        ),
+        Builtin::Menu => (vec![req("_", Text)], Children::Required),
+        Builtin::Link => (
+            vec![req("_", Text), req("url", Expr(Type::String))],
+            Children::None,
+        ),
+        Builtin::TextEditor => (vec![req("text", Binding(Type::String))], Children::None),
+        Builtin::Label => (
+            vec![req("_", Text), req("icon", Expr(Type::String))],
+            Children::None,
+        ),
+        Builtin::Gauge => (
+            vec![
+                req("value", Number),
+                opt("min", Number),
+                opt("max", Number),
+                opt("label", Text),
+            ],
+            Children::None,
+        ),
     };
     ElementSpec { args, children }
 }
@@ -189,7 +273,14 @@ const CONTROLS: &[Builtin] = &[
     Builtin::SecureField,
     Builtin::Toggle,
     Builtin::Slider,
+    Builtin::Picker,
+    Builtin::DatePicker,
+    Builtin::Stepper,
+    Builtin::Menu,
+    Builtin::Link,
+    Builtin::TextEditor,
 ];
+const TEXT_INPUTS: &[Builtin] = &[Builtin::TextField, Builtin::SecureField];
 
 /// 平台专属组件，`platform`为`ios`或`android`
 pub(crate) fn platform_element(platform: &str, name: &str) -> Option<(ElementKind, ElementSpec)> {
@@ -229,7 +320,13 @@ pub(crate) fn platform_modifier(platform: &str, name: &str) -> Option<ModifierKi
 pub(crate) fn is_parameter_modifier(kind: ModifierKind) -> bool {
     matches!(
         kind,
-        ModifierKind::Font | ModifierKind::Foreground | ModifierKind::Disabled
+        ModifierKind::Font
+            | ModifierKind::Foreground
+            | ModifierKind::Disabled
+            | ModifierKind::Keyboard
+            | ModifierKind::SubmitLabel
+            | ModifierKind::OnSubmit
+            | ModifierKind::Autocapitalization
     )
 }
 
@@ -266,6 +363,12 @@ pub(crate) fn modifier(kind: ModifierKind) -> ModifierSpec {
             vec![req("text", Binding(Type::String)), opt("prompt", Text)],
             None,
         ),
+        ModifierKind::Keyboard => (vec![req("_", Token(KEYBOARDS))], Some(TEXT_INPUTS)),
+        ModifierKind::SubmitLabel => (vec![req("_", Token(SUBMIT_LABELS))], Some(TEXT_INPUTS)),
+        ModifierKind::OnSubmit => (vec![req("_", Action)], Some(TEXT_INPUTS)),
+        ModifierKind::Autocapitalization => {
+            (vec![req("_", Token(CAPITALIZATION))], Some(TEXT_INPUTS))
+        }
     };
     ModifierSpec { args, applies_to }
 }

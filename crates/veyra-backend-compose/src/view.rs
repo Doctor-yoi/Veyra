@@ -14,6 +14,8 @@ use veyra_ir::{
 
 use crate::kotlin::{self, ExprCx, Imports, dp, float, ident};
 
+mod controls;
+
 /// 父布局，决定可用的作用域修饰符
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Parent {
@@ -29,6 +31,8 @@ pub(crate) struct ViewEmitter<'a> {
     pub im: &'a mut Imports,
     /// 提升出的局部变量计数
     pub temp: usize,
+    /// 位于Menu中时为控制展开的变量名，按钮生成为菜单项
+    pub menu: Option<String>,
 }
 
 struct Call {
@@ -315,6 +319,10 @@ impl ViewEmitter<'_> {
                 ModifierKind::SwiftUi
                 | ModifierKind::Refreshable
                 | ModifierKind::Searchable
+                | ModifierKind::Keyboard
+                | ModifierKind::SubmitLabel
+                | ModifierKind::OnSubmit
+                | ModifierKind::Autocapitalization
                 | ModifierKind::Font
                 | ModifierKind::Foreground
                 | ModifierKind::Disabled => {}
@@ -429,6 +437,20 @@ impl ViewEmitter<'_> {
         el: &Element,
         parent: Parent,
         base: Option<&str>,
+    ) {
+        // 菜单只作用于直接内容，嵌套的组件恢复普通生成
+        let menu = self.menu.take();
+        self.element_inner(w, el, parent, base, menu.as_deref());
+        self.menu = menu;
+    }
+
+    fn element_inner(
+        &mut self,
+        w: &mut CodeWriter,
+        el: &Element,
+        parent: Parent,
+        base: Option<&str>,
+        menu: Option<&str>,
     ) {
         let base = base.unwrap_or("Modifier");
         // 下拉刷新与搜索在Compose中是包裹组件，先输出外层再输出组件本身
@@ -915,6 +937,7 @@ impl ViewEmitter<'_> {
                 w.line("}");
             }
             Builtin::ForEach => {
+                self.menu = menu.map(str::to_string);
                 self.im.add("androidx.compose.runtime.key");
                 let list = match arg("_").and_then(Value::as_expr) {
                     Some(x) => kotlin::atom(self.cx, x, self.im),
@@ -944,11 +967,28 @@ impl ViewEmitter<'_> {
                 }
                 call.render(w, None);
             }
+            Builtin::Button if menu.is_some() => {
+                self.menu_item(w, el, menu.unwrap_or_default(), base);
+            }
             Builtin::Button => {
-                self.im.add("androidx.compose.material3.Button");
+                let role = arg("role").and_then(Value::as_token);
+                let name = if role == Some("cancel") {
+                    "TextButton"
+                } else {
+                    "Button"
+                };
+                self.im.add(&format!("androidx.compose.material3.{name}"));
                 let a = self.action(arg("action"));
-                let mut call = Call::new("Button");
+                let mut call = Call::new(name);
                 call.arg("onClick", format!("{{ {a} }}"));
+                if role == Some("destructive") {
+                    self.im.add("androidx.compose.material3.ButtonDefaults");
+                    self.im.add("androidx.compose.material3.MaterialTheme");
+                    call.arg(
+                        "colors",
+                        "ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError)",
+                    );
+                }
                 if let Some(en) = self.enabled(mods) {
                     call.arg("enabled", en);
                 }
@@ -975,6 +1015,7 @@ impl ViewEmitter<'_> {
                         .add("androidx.compose.ui.text.input.PasswordVisualTransformation");
                     call.arg("visualTransformation", "PasswordVisualTransformation()");
                 }
+                self.keyboard_args(&mut call, el);
                 if let Some(en) = self.enabled(mods) {
                     call.arg("enabled", en);
                 }
@@ -1088,27 +1129,17 @@ impl ViewEmitter<'_> {
                 }
                 call.render(w, None);
             }
-            Builtin::Progress => {
-                let mut call = match arg("value").and_then(Value::as_expr) {
-                    Some(x) => {
-                        self.im
-                            .add("androidx.compose.material3.LinearProgressIndicator");
-                        let v = float(self.cx, x, self.im);
-                        let mut c = Call::new("LinearProgressIndicator");
-                        c.arg("progress", format!("{{ {v} }}"));
-                        c
-                    }
-                    None => {
-                        self.im
-                            .add("androidx.compose.material3.CircularProgressIndicator");
-                        Call::new("CircularProgressIndicator")
-                    }
-                };
-                if let Some(m) = self.modifier_chain(w, mods, None, base) {
-                    call.arg("modifier", m);
-                }
-                call.render(w, None);
-            }
+            Builtin::Progress => self.progress(w, el, base),
+            Builtin::Picker => self.picker(w, el, base),
+            // 由Picker收集为选项列表
+            Builtin::Option => {}
+            Builtin::DatePicker => self.date_picker(w, el, base),
+            Builtin::Stepper => self.stepper(w, el, base),
+            Builtin::Menu => self.menu(w, el, base),
+            Builtin::Link => self.link(w, el, base),
+            Builtin::TextEditor => self.text_editor(w, el, base),
+            Builtin::Label => self.label(w, el, base),
+            Builtin::Gauge => self.gauge(w, el, base),
         }
     }
 }

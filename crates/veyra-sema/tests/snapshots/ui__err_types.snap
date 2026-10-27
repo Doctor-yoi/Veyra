@@ -42,7 +42,7 @@ error[V2011]: 默认值必须是常量
 23 |     label: String = items.count
    |                     ^^^^^
    |
-   = note: 可以使用字面量、列表字面量、枚举成员与nil
+   = note: 可以使用字面量、列表字面量、枚举成员、nil与now()
 
 error[V3007]: computed`a`存在循环依赖
   --> err_types.vey:27:5
@@ -132,7 +132,7 @@ error[V1012]: 未知的修饰符`.blur`
 43 |       Text("x").font(.huge).blur(3)
    |                             ^^^^
    |
-   = note: 内置修饰符：padding、font、foreground、background、frame、disabled、hidden、onTap、accessibilityLabel、refreshable、searchable
+   = note: 内置修饰符：padding、font、foreground、background、frame、disabled、hidden、onTap、accessibilityLabel、refreshable、searchable、keyboard、submitLabel、onSubmit、autocapitalization
 
 error[V1011]: 未知的组件`Unknown`
   --> err_types.vey:44:7
@@ -140,7 +140,7 @@ error[V1011]: 未知的组件`Unknown`
 44 |       Unknown()
    |       ^^^^^^^
    |
-   = note: 内置组件：Column、Row、Stack、ScrollView、Text、Button、TextField、SecureField、Toggle、Slider、Image、Spacer、Divider、Progress、List、ForEach、LazyColumn、LazyRow、LazyGrid、Section、Form、GroupBox、DisclosureGroup
+   = note: 内置组件：Column、Row、Stack、ScrollView、Text、Button、TextField、SecureField、Toggle、Slider、Image、Spacer、Divider、Progress、List、ForEach、LazyColumn、LazyRow、LazyGrid、Section、Form、GroupBox、DisclosureGroup、Picker、Option、DatePicker、Stepper、Menu、Link、TextEditor、Label、Gauge
 
 error[V2034]: 组件`Spacer`不接受子组件
   --> err_types.vey:45:16

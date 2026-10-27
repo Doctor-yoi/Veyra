@@ -74,6 +74,8 @@ pub enum ExprKind {
     Double(f64),
     String(String),
     Nil,
+    /// 当前时间
+    Now,
     List(Vec<Expr>),
     EnumCase {
         enum_name: String,
@@ -248,6 +250,16 @@ pub enum Builtin {
     Form,
     GroupBox,
     DisclosureGroup,
+    Picker,
+    /// Picker的选项
+    Option,
+    DatePicker,
+    Stepper,
+    Menu,
+    Link,
+    TextEditor,
+    Label,
+    Gauge,
 }
 
 /// 内置组件与名称
@@ -275,6 +287,15 @@ const BUILTINS: &[(Builtin, &str)] = &[
     (Builtin::Form, "Form"),
     (Builtin::GroupBox, "GroupBox"),
     (Builtin::DisclosureGroup, "DisclosureGroup"),
+    (Builtin::Picker, "Picker"),
+    (Builtin::Option, "Option"),
+    (Builtin::DatePicker, "DatePicker"),
+    (Builtin::Stepper, "Stepper"),
+    (Builtin::Menu, "Menu"),
+    (Builtin::Link, "Link"),
+    (Builtin::TextEditor, "TextEditor"),
+    (Builtin::Label, "Label"),
+    (Builtin::Gauge, "Gauge"),
 ];
 
 impl Builtin {
@@ -403,6 +424,11 @@ pub enum ModifierKind {
     SwiftUi,
     Refreshable,
     Searchable,
+    /// 文本框的键盘类型
+    Keyboard,
+    SubmitLabel,
+    OnSubmit,
+    Autocapitalization,
     Android(AndroidModifier),
     Padding,
     Font,
@@ -416,7 +442,7 @@ pub enum ModifierKind {
 }
 
 impl ModifierKind {
-    pub const ALL: [ModifierKind; 11] = [
+    pub const ALL: [ModifierKind; 15] = [
         ModifierKind::Padding,
         ModifierKind::Font,
         ModifierKind::Foreground,
@@ -428,6 +454,10 @@ impl ModifierKind {
         ModifierKind::AccessibilityLabel,
         ModifierKind::Refreshable,
         ModifierKind::Searchable,
+        ModifierKind::Keyboard,
+        ModifierKind::SubmitLabel,
+        ModifierKind::OnSubmit,
+        ModifierKind::Autocapitalization,
     ];
 
     pub fn name(self) -> &'static str {
@@ -443,6 +473,10 @@ impl ModifierKind {
             ModifierKind::AccessibilityLabel => "accessibilityLabel",
             ModifierKind::Refreshable => "refreshable",
             ModifierKind::Searchable => "searchable",
+            ModifierKind::Keyboard => "keyboard",
+            ModifierKind::SubmitLabel => "submitLabel",
+            ModifierKind::OnSubmit => "onSubmit",
+            ModifierKind::Autocapitalization => "autocapitalization",
             ModifierKind::SwiftUi | ModifierKind::Android(_) => "platform",
         }
     }

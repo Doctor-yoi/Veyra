@@ -161,6 +161,7 @@ fn emit(cx: ExprCx, e: &Expr) -> (String, u8) {
         ExprKind::Double(v) => atom(double_literal(*v)),
         ExprKind::String(s) => atom(string_literal(s)),
         ExprKind::Nil => atom("nil".into()),
+        ExprKind::Now => atom("Date()".into()),
         ExprKind::List(items) => atom(format!(
             "[{}]",
             items

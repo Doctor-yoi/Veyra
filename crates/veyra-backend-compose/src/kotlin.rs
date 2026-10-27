@@ -178,6 +178,10 @@ fn emit(cx: ExprCx, e: &Expr, im: &mut Imports) -> (String, u8) {
         ExprKind::Double(v) => a(double_literal(*v)),
         ExprKind::String(s) => a(string_literal(s)),
         ExprKind::Nil => a("null".into()),
+        ExprKind::Now => {
+            im.add("java.time.Instant");
+            a("Instant.now()".into())
+        }
         ExprKind::List(items) if items.is_empty() => a("emptyList()".into()),
         ExprKind::List(items) => {
             let parts: Vec<_> = items.iter().map(|i| expr(cx, i, im)).collect();

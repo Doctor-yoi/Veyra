@@ -6,7 +6,7 @@
 use veyra_codegen::CodeWriter;
 use veyra_ir::{
     ActionRef, BindingRef, Builtin, Element, ElementKind, Expr, ExprKind, FrameworkCall,
-    FrameworkValue, Modifier, ModifierKind, NativeSegment, SwiftConv, Value, ViewNode,
+    FrameworkValue, Modifier, ModifierKind, NativeSegment, SwiftConv, Type, Value, ViewNode,
 };
 
 use crate::swift::{self, ExprCx, double_literal, plain_string_arg};
@@ -374,7 +374,11 @@ fn element(w: &mut CodeWriter, cx: ViewCx, el: &Element) {
             leaf(w, cx, text, el);
         }
         Builtin::Button => {
-            w.line(format!("Button({}) {{", text_arg(cx, arg("_"))));
+            let role = match arg("role").and_then(Value::as_token) {
+                Some(r) => format!(", role: .{r}"),
+                None => String::new(),
+            };
+            w.line(format!("Button({}{role}) {{", text_arg(cx, arg("_"))));
             w.indent();
             w.line(action(cx, arg("action")));
             w.dedent();
@@ -427,11 +431,196 @@ fn element(w: &mut CodeWriter, cx: ViewCx, el: &Element) {
         Builtin::Spacer => leaf(w, cx, "Spacer()".into(), el),
         Builtin::Divider => leaf(w, cx, "Divider()".into(), el),
         Builtin::Progress => {
-            let text = match number(cx, arg("value")) {
-                Some(v) => format!("ProgressView(value: {v})"),
-                None => "ProgressView()".into(),
+            let mut parts = Vec::new();
+            if let Some(l) = arg("_") {
+                parts.push(text_arg(cx, Some(l)));
+            }
+            if let Some(v) = number(cx, arg("value")) {
+                parts.push(format!("value: {v}"));
+                if let Some(t) = number(cx, arg("total")) {
+                    parts.push(format!("total: {t}"));
+                }
+            }
+            w.line(format!("ProgressView({})", parts.join(", ")));
+            w.indent();
+            if let Some(style) = arg("style").and_then(Value::as_token) {
+                w.line(format!(".progressViewStyle(.{style})"));
+            }
+            trailing_modifiers(w, cx, &el.modifiers);
+            w.dedent();
+        }
+        Builtin::Picker => {
+            let selection = match arg("selection").and_then(Value::as_binding) {
+                Some(BindingRef::State { ty, .. } | BindingRef::Param { ty, .. }) => ty.clone(),
+                None => Type::Unknown,
             };
+            w.line(format!(
+                "Picker({}, selection: {}) {{",
+                text_arg(cx, arg("_")),
+                binding(cx, arg("selection"))
+            ));
+            w.indent();
+            picker_options(w, cx, &el.children, &selection);
+            w.dedent();
+            w.line("}");
+            match arg("style").and_then(Value::as_token) {
+                Some("automatic") | None => {}
+                Some(style) => w.line(format!(".pickerStyle(.{style})")),
+            }
+            trailing_modifiers(w, cx, &el.modifiers);
+        }
+        // 只会出现在Picker中，由picker_options生成
+        Builtin::Option => {}
+        Builtin::DatePicker => {
+            let components = match arg("components").and_then(Value::as_token) {
+                Some("date") => ", displayedComponents: [.date]",
+                Some("time") => ", displayedComponents: [.hourAndMinute]",
+                _ => "",
+            };
+            w.line(format!(
+                "DatePicker({}, selection: {}{components})",
+                text_arg(cx, arg("_")),
+                binding(cx, arg("selection"))
+            ));
+            w.indent();
+            match arg("style").and_then(Value::as_token) {
+                Some("automatic") | None => {}
+                Some(style) => w.line(format!(".datePickerStyle(.{style})")),
+            }
+            trailing_modifiers(w, cx, &el.modifiers);
+            w.dedent();
+        }
+        Builtin::Stepper => {
+            let double = matches!(
+                arg("value").and_then(Value::as_binding),
+                Some(BindingRef::State { ty, .. } | BindingRef::Param { ty, .. }) if *ty == Type::Double
+            );
+            let mut text = format!(
+                "Stepper({}, value: {}",
+                text_arg(cx, arg("_")),
+                binding(cx, arg("value"))
+            );
+            let (min, max) = (number(cx, arg("min")), number(cx, arg("max")));
+            if min.is_some() || max.is_some() {
+                let (lo, hi) = if double {
+                    ("-Double.infinity", "Double.infinity")
+                } else {
+                    ("Int.min", "Int.max")
+                };
+                text.push_str(&format!(
+                    ", in: {}...{}",
+                    min.unwrap_or_else(|| lo.into()),
+                    max.unwrap_or_else(|| hi.into())
+                ));
+            }
+            if let Some(step) = number(cx, arg("step")) {
+                text.push_str(&format!(", step: {step}"));
+            }
+            text.push(')');
             leaf(w, cx, text, el);
+        }
+        Builtin::Menu => {
+            let head = format!("Menu({})", text_arg(cx, arg("_")));
+            container(w, cx, &head, None, el);
+        }
+        Builtin::Link => leaf(
+            w,
+            cx,
+            format!(
+                "Link({}, destination: URL(string: {})!)",
+                text_arg(cx, arg("_")),
+                e(cx, arg("url"))
+            ),
+            el,
+        ),
+        Builtin::TextEditor => leaf(
+            w,
+            cx,
+            format!("TextEditor(text: {})", binding(cx, arg("text"))),
+            el,
+        ),
+        Builtin::Label => leaf(
+            w,
+            cx,
+            format!(
+                "Label({}, systemImage: {})",
+                text_arg(cx, arg("_")),
+                e(cx, arg("icon"))
+            ),
+            el,
+        ),
+        Builtin::Gauge => {
+            let min = number(cx, arg("min")).unwrap_or_else(|| double_literal(0.0));
+            let max = number(cx, arg("max")).unwrap_or_else(|| double_literal(1.0));
+            let label = match arg("label").and_then(Value::as_expr) {
+                Some(x) => text_view(cx, x),
+                None => "EmptyView()".into(),
+            };
+            w.line(format!(
+                "Gauge(value: {}, in: {min}...{max}) {{ {label} }}",
+                e(cx, arg("value"))
+            ));
+            modifiers_only(w, cx, &el.modifiers);
+        }
+    }
+}
+
+/// `Text`视图，字面量不做本地化查找
+fn text_view(cx: ViewCx, x: &Expr) -> String {
+    match &x.kind {
+        ExprKind::String(s) => format!("Text(verbatim: {})", swift::string_literal(s)),
+        _ => format!("Text({})", swift::expr(cx.expr, x)),
+    }
+}
+
+/// Picker的选项，tag的类型需要与selection完全一致
+fn picker_options(w: &mut CodeWriter, cx: ViewCx, nodes: &[ViewNode], selection: &Type) {
+    let optional = selection.is_optional();
+    for node in nodes {
+        let ViewNode::Element(el) = node else {
+            continue;
+        };
+        match el.kind {
+            ElementKind::Builtin(Builtin::Option) => {
+                let label = match el.arg("_").and_then(Value::as_expr) {
+                    Some(x) => text_view(cx, x),
+                    None => "Text(verbatim: \"\")".into(),
+                };
+                w.line(label);
+                w.indent();
+                let value = match el.arg("value").and_then(Value::as_expr) {
+                    Some(Expr {
+                        kind: ExprKind::Nil,
+                        ..
+                    }) => format!("nil as {}", swift::ty(selection)),
+                    Some(x) if optional && !x.ty.is_optional() => {
+                        format!("Optional({})", swift::expr(cx.expr, x))
+                    }
+                    Some(x) => swift::expr(cx.expr, x),
+                    None => "0".into(),
+                };
+                w.line(format!(".tag({value})"));
+                trailing_modifiers(w, cx, &el.modifiers);
+                w.dedent();
+            }
+            ElementKind::Builtin(Builtin::ForEach) => {
+                let key = el.arg("key").and_then(Value::as_key_path).unwrap_or("id");
+                let item = el
+                    .item
+                    .as_ref()
+                    .map(|(n, _)| swift::ident(n))
+                    .unwrap_or_else(|| "item".into());
+                w.line(format!(
+                    "ForEach({}, id: \\.{}) {{ {item} in",
+                    e(cx, el.arg("_")),
+                    swift::ident(key)
+                ));
+                w.indent();
+                picker_options(w, cx, &el.children, selection);
+                w.dedent();
+                w.line("}");
+            }
+            _ => {}
         }
     }
 }
@@ -581,6 +770,26 @@ fn modifier(cx: ViewCx, m: &Modifier) -> Vec<String> {
             s.push(')');
             vec![s]
         }
+        ModifierKind::Keyboard => {
+            let t = match arg("_").and_then(Value::as_token).unwrap_or("default") {
+                "email" => "emailAddress",
+                "number" => "numberPad",
+                "decimal" => "decimalPad",
+                "phone" => "phonePad",
+                "url" => "URL",
+                _ => "default",
+            };
+            vec![format!(".keyboardType(.{t})")]
+        }
+        ModifierKind::SubmitLabel => vec![format!(
+            ".submitLabel(.{})",
+            arg("_").and_then(Value::as_token).unwrap_or("done")
+        )],
+        ModifierKind::OnSubmit => vec![format!(".onSubmit {{ {} }}", action(cx, arg("_")))],
+        ModifierKind::Autocapitalization => vec![format!(
+            ".textInputAutocapitalization(.{})",
+            arg("_").and_then(Value::as_token).unwrap_or("sentences")
+        )],
         ModifierKind::SwiftUi => match &m.call {
             Some(call) => vec![format!(".{}", framework_call(cx, call))],
             None => Vec::new(),

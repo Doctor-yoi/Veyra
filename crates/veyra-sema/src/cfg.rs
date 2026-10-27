@@ -59,6 +59,11 @@ impl<'t> Cfg<'t> {
     }
 
     /// 已确定的Apple系统，保留系统差异时为None
+    /// 需要保留为原生条件的系统
+    pub fn residual(&self) -> &[AppleOs] {
+        &self.residual
+    }
+
     pub fn fixed_os(&self) -> Option<AppleOs> {
         if self.residual.is_empty() {
             self.fixed
