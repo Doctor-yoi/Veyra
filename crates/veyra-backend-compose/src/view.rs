@@ -51,6 +51,11 @@ impl Call {
 
     fn render(&self, w: &mut CodeWriter, trailing: Option<&str>) {
         let suffix = trailing.map(|t| format!(" {t}")).unwrap_or_default();
+        // 只有尾随lambda时省略空括号
+        if self.args.is_empty() && trailing.is_some() {
+            w.line(format!("{}{suffix}", self.name));
+            return;
+        }
         let single = format!("{}({}){suffix}", self.name, self.args.join(", "));
         if single.len() <= 100 || self.args.len() <= 1 {
             w.line(single);
@@ -308,6 +313,8 @@ impl ViewEmitter<'_> {
                     parts.push(call);
                 }
                 ModifierKind::SwiftUi
+                | ModifierKind::Refreshable
+                | ModifierKind::Searchable
                 | ModifierKind::Font
                 | ModifierKind::Foreground
                 | ModifierKind::Disabled => {}
@@ -424,6 +431,98 @@ impl ViewEmitter<'_> {
         base: Option<&str>,
     ) {
         let base = base.unwrap_or("Modifier");
+        // 下拉刷新与搜索在Compose中是包裹组件，先输出外层再输出组件本身
+        if el
+            .modifiers
+            .iter()
+            .any(|m| matches!(m.kind, ModifierKind::Refreshable | ModifierKind::Searchable))
+        {
+            // 带条件的包裹修饰符拆成两个分支，条件不成立时输出不带该修饰符的组件
+            let wrapper = |m: &Modifier| {
+                matches!(m.kind, ModifierKind::Refreshable | ModifierKind::Searchable)
+            };
+            if let Some(i) = el
+                .modifiers
+                .iter()
+                .position(|m| wrapper(m) && m.cond.is_some())
+            {
+                let mut with = el.clone();
+                let cond = with.modifiers[i].cond.take();
+                let mut without = el.clone();
+                without.modifiers.remove(i);
+                let c = cond.map(|c| self.native_cond(&c)).unwrap_or_default();
+                w.line(format!("if ({c}) {{"));
+                w.indent();
+                self.element(w, &with, parent, Some(base));
+                w.dedent();
+                w.line("} else {");
+                w.indent();
+                self.element(w, &without, parent, Some(base));
+                w.dedent();
+                w.line("}");
+                return;
+            }
+            let mut inner = el.clone();
+            inner.modifiers.retain(|m| {
+                !matches!(m.kind, ModifierKind::Refreshable | ModifierKind::Searchable)
+            });
+            let wrappers: Vec<&Modifier> = el
+                .modifiers
+                .iter()
+                .filter(|m| matches!(m.kind, ModifierKind::Refreshable | ModifierKind::Searchable))
+                .collect();
+            let mut outer = Some(base.to_string());
+            for m in wrappers.iter().rev() {
+                let modifier = outer.take().unwrap_or_else(|| "Modifier".into());
+                self.im.add("androidx.compose.ui.Modifier");
+                match m.kind {
+                    ModifierKind::Refreshable => {
+                        self.im
+                            .add("androidx.compose.material3.pulltorefresh.PullToRefreshBox");
+                        self.im.experimental = true;
+                        let refreshing = match m.arg("isRefreshing").and_then(Value::as_expr) {
+                            Some(x) => self.e(x),
+                            None => "false".into(),
+                        };
+                        let a = self.action(m.arg("_"));
+                        let mut call = Call::new("PullToRefreshBox");
+                        call.arg("isRefreshing", refreshing)
+                            .arg("onRefresh", format!("{{ {a} }}"))
+                            .arg("modifier", modifier);
+                        call.render(w, Some("{"));
+                    }
+                    _ => {
+                        self.im.add("androidx.compose.foundation.layout.Column");
+                        self.im
+                            .add("androidx.compose.foundation.layout.fillMaxWidth");
+                        self.im.add("androidx.compose.material3.OutlinedTextField");
+                        self.im.add("androidx.compose.material3.Text");
+                        w.line(format!("Column(modifier = {modifier}) {{"));
+                        w.indent();
+                        let (value, change) = self.binding(m.arg("text"), "");
+                        let mut field = Call::new("OutlinedTextField");
+                        field
+                            .arg("value", value)
+                            .arg("onValueChange", change)
+                            .arg("singleLine", "true");
+                        if let Some(p) = m.arg("prompt").and_then(Value::as_expr) {
+                            let p = self.e(p);
+                            field.arg("placeholder", format!("{{ Text(text = {p}) }}"));
+                        }
+                        field.arg("modifier", "Modifier.fillMaxWidth()");
+                        field.render(w, None);
+                        w.dedent();
+                    }
+                }
+                w.indent();
+            }
+            self.element(w, &inner, Parent::Other, None);
+            for _ in &wrappers {
+                w.dedent();
+                w.line("}");
+            }
+            return;
+        }
         let b = match &el.kind {
             ElementKind::Builtin(b) => b,
             ElementKind::Android(AndroidElement::FloatingActionButton) => {
@@ -475,7 +574,10 @@ impl ViewEmitter<'_> {
         let arg = |n: &str| el.arg(n);
         match b {
             Builtin::Column | Builtin::Row | Builtin::Stack | Builtin::ScrollView => {
+                let horizontal = *b == Builtin::ScrollView
+                    && arg("axis").and_then(Value::as_token) == Some("horizontal");
                 let (name, child_parent) = match b {
+                    Builtin::ScrollView if horizontal => ("Row", Parent::Row),
                     Builtin::Column | Builtin::ScrollView => ("Column", Parent::Column),
                     Builtin::Row => ("Row", Parent::Row),
                     _ => ("Box", Parent::Other),
@@ -484,10 +586,19 @@ impl ViewEmitter<'_> {
                     .add(&format!("androidx.compose.foundation.layout.{name}"));
                 let mut call = Call::new(name);
                 let scroll = if *b == Builtin::ScrollView {
-                    self.im.add("androidx.compose.foundation.verticalScroll");
+                    let f = if horizontal {
+                        "horizontalScroll"
+                    } else {
+                        "verticalScroll"
+                    };
+                    self.im.add(&format!("androidx.compose.foundation.{f}"));
                     self.im
                         .add("androidx.compose.foundation.rememberScrollState");
-                    Some("verticalScroll(rememberScrollState())")
+                    Some(if horizontal {
+                        "horizontalScroll(rememberScrollState())"
+                    } else {
+                        "verticalScroll(rememberScrollState())"
+                    })
                 } else {
                     None
                 };
@@ -517,8 +628,8 @@ impl ViewEmitter<'_> {
                 let token = arg("alignment")
                     .and_then(Value::as_token)
                     .unwrap_or("center");
-                match b {
-                    Builtin::Row => {
+                match (b, name) {
+                    (_, "Row") => {
                         let a = match token {
                             "top" => "Top",
                             "bottom" => "Bottom",
@@ -526,7 +637,7 @@ impl ViewEmitter<'_> {
                         };
                         call.arg("verticalAlignment", format!("Alignment.{a}"));
                     }
-                    Builtin::Stack => {
+                    (Builtin::Stack, _) => {
                         let a = match token {
                             "topLeading" => "TopStart",
                             "top" => "TopCenter",
@@ -577,6 +688,227 @@ impl ViewEmitter<'_> {
                 w.indent();
                 // LazyItemScope中没有weight
                 self.nodes(w, &el.children, Parent::Other);
+                w.dedent();
+                w.line("}");
+                w.dedent();
+                w.line("}");
+            }
+            Builtin::LazyColumn | Builtin::LazyRow | Builtin::LazyGrid => {
+                let (name, items_import) = match b {
+                    Builtin::LazyRow => ("LazyRow", "androidx.compose.foundation.lazy.items"),
+                    Builtin::LazyColumn => ("LazyColumn", "androidx.compose.foundation.lazy.items"),
+                    _ => (
+                        "LazyVerticalGrid",
+                        "androidx.compose.foundation.lazy.grid.items",
+                    ),
+                };
+                let package = if *b == Builtin::LazyGrid {
+                    "lazy.grid"
+                } else {
+                    "lazy"
+                };
+                self.im
+                    .add(&format!("androidx.compose.foundation.{package}.{name}"));
+                self.im.add(items_import);
+                let mut call = Call::new(name);
+                if *b == Builtin::LazyGrid {
+                    self.im
+                        .add("androidx.compose.foundation.lazy.grid.GridCells");
+                    let cells = match (
+                        arg("minWidth").and_then(Value::as_expr),
+                        arg("columns").and_then(Value::as_expr),
+                    ) {
+                        (Some(min), _) => {
+                            format!("GridCells.Adaptive({})", dp(self.cx, min, self.im))
+                        }
+                        (None, Some(n)) => format!("GridCells.Fixed({})", self.e(n)),
+                        (None, None) => "GridCells.Fixed(2)".into(),
+                    };
+                    call.arg("columns", cells);
+                }
+                if let Some(m) = self.modifier_chain(w, mods, None, base) {
+                    call.arg("modifier", m);
+                }
+                if let Some(x) = arg("spacing").and_then(Value::as_expr) {
+                    self.im
+                        .add("androidx.compose.foundation.layout.Arrangement");
+                    let d = dp(self.cx, x, self.im);
+                    match b {
+                        Builtin::LazyRow => {
+                            call.arg(
+                                "horizontalArrangement",
+                                format!("Arrangement.spacedBy({d})"),
+                            );
+                        }
+                        Builtin::LazyColumn => {
+                            call.arg("verticalArrangement", format!("Arrangement.spacedBy({d})"));
+                        }
+                        _ => {
+                            call.arg("verticalArrangement", format!("Arrangement.spacedBy({d})"));
+                            call.arg(
+                                "horizontalArrangement",
+                                format!("Arrangement.spacedBy({d})"),
+                            );
+                        }
+                    }
+                }
+                call.render(w, Some("{"));
+                w.indent();
+                let list = self.ev(arg("_"));
+                let key = ident(arg("key").and_then(Value::as_key_path).unwrap_or("id"));
+                let item = el
+                    .item
+                    .as_ref()
+                    .map(|(n, _)| ident(n))
+                    .unwrap_or_else(|| "item".into());
+                w.line(format!(
+                    "items(items = {list}, key = {{ it.{key} }}) {{ {item} ->"
+                ));
+                w.indent();
+                self.nodes(w, &el.children, Parent::Other);
+                w.dedent();
+                w.line("}");
+                w.dedent();
+                w.line("}");
+            }
+            Builtin::Section | Builtin::Form | Builtin::GroupBox => {
+                self.im.add("androidx.compose.foundation.layout.Column");
+                self.im
+                    .add("androidx.compose.foundation.layout.Arrangement");
+                self.im.add("androidx.compose.ui.unit.dp");
+                let card = *b == Builtin::GroupBox;
+                if card {
+                    self.im.add("androidx.compose.material3.Card");
+                    let mut c = Call::new("Card");
+                    if let Some(m) = self.modifier_chain(w, mods, None, base) {
+                        c.arg("modifier", m);
+                    }
+                    c.render(w, Some("{"));
+                    w.indent();
+                }
+                let mut col = Call::new("Column");
+                let chain = if card {
+                    None
+                } else {
+                    self.modifier_chain(w, mods, None, base)
+                };
+                match b {
+                    Builtin::Form => {
+                        self.im.add("androidx.compose.foundation.verticalScroll");
+                        self.im
+                            .add("androidx.compose.foundation.rememberScrollState");
+                        self.im.add("androidx.compose.foundation.layout.padding");
+                        self.im.add("androidx.compose.ui.Modifier");
+                        let m = chain.unwrap_or_else(|| "Modifier".into());
+                        col.arg(
+                            "modifier",
+                            format!("{m}.verticalScroll(rememberScrollState()).padding(16.dp)"),
+                        );
+                        col.arg("verticalArrangement", "Arrangement.spacedBy(12.dp)");
+                    }
+                    Builtin::GroupBox => {
+                        self.im.add("androidx.compose.foundation.layout.padding");
+                        self.im.add("androidx.compose.ui.Modifier");
+                        col.arg("modifier", "Modifier.padding(16.dp)");
+                        col.arg("verticalArrangement", "Arrangement.spacedBy(8.dp)");
+                    }
+                    _ => {
+                        if let Some(m) = chain {
+                            col.arg("modifier", m);
+                        }
+                        col.arg("verticalArrangement", "Arrangement.spacedBy(8.dp)");
+                    }
+                }
+                col.render(w, Some("{"));
+                w.indent();
+                let header = if *b == Builtin::Section {
+                    arg("header")
+                } else {
+                    arg("_")
+                };
+                if let Some(h) = header.and_then(Value::as_expr) {
+                    let t = self.e(h);
+                    let mut text = self.text_call(t, &[]);
+                    self.im.add("androidx.compose.material3.MaterialTheme");
+                    let style = if card { "titleMedium" } else { "labelLarge" };
+                    text.arg("style", format!("MaterialTheme.typography.{style}"));
+                    text.render(w, None);
+                }
+                self.nodes(w, &el.children, Parent::Column);
+                if let Some(f) = arg("footer").and_then(Value::as_expr) {
+                    let t = self.e(f);
+                    let mut text = self.text_call(t, &[]);
+                    self.im.add("androidx.compose.material3.MaterialTheme");
+                    text.arg("style", "MaterialTheme.typography.labelSmall");
+                    text.render(w, None);
+                }
+                w.dedent();
+                w.line("}");
+                if card {
+                    w.dedent();
+                    w.line("}");
+                }
+            }
+            Builtin::DisclosureGroup => {
+                for i in [
+                    "androidx.compose.foundation.layout.Column",
+                    "androidx.compose.foundation.layout.Row",
+                    "androidx.compose.foundation.layout.fillMaxWidth",
+                    "androidx.compose.foundation.clickable",
+                    "androidx.compose.ui.Alignment",
+                    "androidx.compose.ui.Modifier",
+                ] {
+                    self.im.add(i);
+                }
+                // 没有绑定时在组件内部记住展开状态
+                let (value, toggle) = match arg("isExpanded") {
+                    Some(v) => {
+                        let (value, change) = self.binding(Some(v), "");
+                        let change = change
+                            .trim_start_matches('{')
+                            .trim_end_matches('}')
+                            .trim()
+                            .replace("(it)", &format!("(!{value})"));
+                        (value, change)
+                    }
+                    None => {
+                        for i in [
+                            "androidx.compose.runtime.getValue",
+                            "androidx.compose.runtime.setValue",
+                            "androidx.compose.runtime.mutableStateOf",
+                            "androidx.compose.runtime.saveable.rememberSaveable",
+                        ] {
+                            self.im.add(i);
+                        }
+                        let name = format!("expanded{}", self.temp);
+                        self.temp += 1;
+                        w.line(format!(
+                            "var {name} by rememberSaveable {{ mutableStateOf(false) }}"
+                        ));
+                        (name.clone(), format!("{name} = !{name}"))
+                    }
+                };
+                let mut col = Call::new("Column");
+                if let Some(m) = self.modifier_chain(w, mods, None, base) {
+                    col.arg("modifier", m);
+                }
+                col.render(w, Some("{"));
+                w.indent();
+                w.line(format!(
+                    "Row(modifier = Modifier.fillMaxWidth().clickable {{ {toggle} }}, verticalAlignment = Alignment.CenterVertically) {{"
+                ));
+                w.indent();
+                let title = self.ev(arg("_"));
+                let mut text = self.text_call(title, &[]);
+                text.arg("modifier", "Modifier.weight(1f)");
+                text.render(w, None);
+                self.text_call(format!("if ({value}) \"▾\" else \"▸\""), &[])
+                    .render(w, None);
+                w.dedent();
+                w.line("}");
+                w.line(format!("if ({value}) {{"));
+                w.indent();
+                self.nodes(w, &el.children, Parent::Column);
                 w.dedent();
                 w.line("}");
                 w.dedent();

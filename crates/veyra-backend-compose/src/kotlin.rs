@@ -49,6 +49,8 @@ pub(crate) struct Imports {
     set: BTreeSet<String>,
     /// R类所在的包
     pub r_package: String,
+    /// 是否用到了需要`@OptIn(ExperimentalMaterial3Api::class)`的API
+    pub experimental: bool,
 }
 
 impl Imports {
@@ -56,6 +58,7 @@ impl Imports {
         Self {
             set: BTreeSet::new(),
             r_package: r_package.to_string(),
+            experimental: false,
         }
     }
 

@@ -241,51 +241,57 @@ pub enum Builtin {
     Progress,
     List,
     ForEach,
+    LazyColumn,
+    LazyRow,
+    LazyGrid,
+    Section,
+    Form,
+    GroupBox,
+    DisclosureGroup,
 }
 
+/// 内置组件与名称
+const BUILTINS: &[(Builtin, &str)] = &[
+    (Builtin::Column, "Column"),
+    (Builtin::Row, "Row"),
+    (Builtin::Stack, "Stack"),
+    (Builtin::ScrollView, "ScrollView"),
+    (Builtin::Text, "Text"),
+    (Builtin::Button, "Button"),
+    (Builtin::TextField, "TextField"),
+    (Builtin::SecureField, "SecureField"),
+    (Builtin::Toggle, "Toggle"),
+    (Builtin::Slider, "Slider"),
+    (Builtin::Image, "Image"),
+    (Builtin::Spacer, "Spacer"),
+    (Builtin::Divider, "Divider"),
+    (Builtin::Progress, "Progress"),
+    (Builtin::List, "List"),
+    (Builtin::ForEach, "ForEach"),
+    (Builtin::LazyColumn, "LazyColumn"),
+    (Builtin::LazyRow, "LazyRow"),
+    (Builtin::LazyGrid, "LazyGrid"),
+    (Builtin::Section, "Section"),
+    (Builtin::Form, "Form"),
+    (Builtin::GroupBox, "GroupBox"),
+    (Builtin::DisclosureGroup, "DisclosureGroup"),
+];
+
 impl Builtin {
-    pub const ALL: [Builtin; 16] = [
-        Builtin::Column,
-        Builtin::Row,
-        Builtin::Stack,
-        Builtin::ScrollView,
-        Builtin::Text,
-        Builtin::Button,
-        Builtin::TextField,
-        Builtin::SecureField,
-        Builtin::Toggle,
-        Builtin::Slider,
-        Builtin::Image,
-        Builtin::Spacer,
-        Builtin::Divider,
-        Builtin::Progress,
-        Builtin::List,
-        Builtin::ForEach,
-    ];
+    pub fn all() -> impl Iterator<Item = Builtin> {
+        BUILTINS.iter().map(|(b, _)| *b)
+    }
 
     pub fn name(self) -> &'static str {
-        match self {
-            Builtin::Column => "Column",
-            Builtin::Row => "Row",
-            Builtin::Stack => "Stack",
-            Builtin::ScrollView => "ScrollView",
-            Builtin::Text => "Text",
-            Builtin::Button => "Button",
-            Builtin::TextField => "TextField",
-            Builtin::SecureField => "SecureField",
-            Builtin::Toggle => "Toggle",
-            Builtin::Slider => "Slider",
-            Builtin::Image => "Image",
-            Builtin::Spacer => "Spacer",
-            Builtin::Divider => "Divider",
-            Builtin::Progress => "Progress",
-            Builtin::List => "List",
-            Builtin::ForEach => "ForEach",
-        }
+        BUILTINS
+            .iter()
+            .find(|(b, _)| *b == self)
+            .map(|(_, n)| *n)
+            .unwrap_or("")
     }
 
     pub fn from_name(name: &str) -> Option<Builtin> {
-        Builtin::ALL.into_iter().find(|b| b.name() == name)
+        BUILTINS.iter().find(|(_, n)| *n == name).map(|(b, _)| *b)
     }
 
     /// 是否为布局容器
@@ -395,6 +401,8 @@ impl Element {
 pub enum ModifierKind {
     /// SwiftUI目录中的修饰符，调用信息位于[`Modifier::call`]
     SwiftUi,
+    Refreshable,
+    Searchable,
     Android(AndroidModifier),
     Padding,
     Font,
@@ -408,7 +416,7 @@ pub enum ModifierKind {
 }
 
 impl ModifierKind {
-    pub const ALL: [ModifierKind; 9] = [
+    pub const ALL: [ModifierKind; 11] = [
         ModifierKind::Padding,
         ModifierKind::Font,
         ModifierKind::Foreground,
@@ -418,6 +426,8 @@ impl ModifierKind {
         ModifierKind::Hidden,
         ModifierKind::OnTap,
         ModifierKind::AccessibilityLabel,
+        ModifierKind::Refreshable,
+        ModifierKind::Searchable,
     ];
 
     pub fn name(self) -> &'static str {
@@ -431,6 +441,8 @@ impl ModifierKind {
             ModifierKind::Hidden => "hidden",
             ModifierKind::OnTap => "onTap",
             ModifierKind::AccessibilityLabel => "accessibilityLabel",
+            ModifierKind::Refreshable => "refreshable",
+            ModifierKind::Searchable => "searchable",
             ModifierKind::SwiftUi | ModifierKind::Android(_) => "platform",
         }
     }

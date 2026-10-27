@@ -201,13 +201,26 @@ fn element(w: &mut CodeWriter, cx: ViewCx, el: &Element) {
             container(w, cx, &head, None, el);
         }
         Builtin::ScrollView => {
-            w.line("ScrollView {");
+            let horizontal = arg("axis").and_then(Value::as_token) == Some("horizontal");
+            let mut params = Vec::new();
+            if horizontal {
+                params.push(".horizontal".to_string());
+            }
+            if let Some(i) = arg("indicators").and_then(Value::as_expr) {
+                params.push(format!("showsIndicators: {}", swift::expr(cx.expr, i)));
+            }
+            let head = if params.is_empty() {
+                "ScrollView".to_string()
+            } else {
+                format!("ScrollView({})", params.join(", "))
+            };
+            w.line(format!("{head} {{"));
             w.indent();
-            // 单个容器子节点直接放入，否则包一层VStack
+            // 单个容器子节点直接放入，否则按方向包一层栈
             match el.children.as_slice() {
                 [ViewNode::Element(child)] if is_stack(child) => nodes(w, cx, &el.children),
                 _ => {
-                    w.line("VStack {");
+                    w.line(if horizontal { "HStack {" } else { "VStack {" });
                     w.indent();
                     nodes(w, cx, &el.children);
                     w.dedent();
@@ -217,6 +230,123 @@ fn element(w: &mut CodeWriter, cx: ViewCx, el: &Element) {
             w.dedent();
             w.line("}");
             trailing_modifiers(w, cx, &el.modifiers);
+        }
+        Builtin::LazyColumn | Builtin::LazyRow | Builtin::LazyGrid => {
+            let key = arg("key").and_then(Value::as_key_path).unwrap_or("id");
+            let item = el
+                .item
+                .as_ref()
+                .map(|(n, _)| swift::ident(n))
+                .unwrap_or_else(|| "item".into());
+            let spacing = number(cx, arg("spacing"));
+            let (scroll, stack) = match b {
+                Builtin::LazyRow => (
+                    "ScrollView(.horizontal)",
+                    format!(
+                        "LazyHStack{}",
+                        spacing
+                            .as_ref()
+                            .map(|s| format!("(spacing: {s})"))
+                            .unwrap_or_default()
+                    ),
+                ),
+                Builtin::LazyColumn => (
+                    "ScrollView",
+                    format!(
+                        "LazyVStack{}",
+                        spacing
+                            .as_ref()
+                            .map(|s| format!("(spacing: {s})"))
+                            .unwrap_or_default()
+                    ),
+                ),
+                _ => {
+                    // 列间距在GridItem上，行间距在LazyVGrid上
+                    let item_spacing = spacing
+                        .as_ref()
+                        .map(|s| format!(", spacing: {s}"))
+                        .unwrap_or_default();
+                    let columns = match (
+                        arg("minWidth").and_then(Value::as_expr),
+                        arg("columns").and_then(Value::as_expr),
+                    ) {
+                        (Some(min), _) => format!(
+                            "[GridItem(.adaptive(minimum: {}){item_spacing})]",
+                            swift::expr(cx.expr, min)
+                        ),
+                        (None, Some(n)) => format!(
+                            "Array(repeating: GridItem(.flexible(){item_spacing}), count: {})",
+                            swift::expr(cx.expr, n)
+                        ),
+                        (None, None) => format!(
+                            "Array(repeating: GridItem(.flexible(){item_spacing}), count: 2)"
+                        ),
+                    };
+                    let spacing = spacing
+                        .as_ref()
+                        .map(|s| format!(", spacing: {s}"))
+                        .unwrap_or_default();
+                    (
+                        "ScrollView",
+                        format!("LazyVGrid(columns: {columns}{spacing})"),
+                    )
+                }
+            };
+            w.line(format!("{scroll} {{"));
+            w.indent();
+            w.line(format!("{stack} {{"));
+            w.indent();
+            w.line(format!(
+                "ForEach({}, id: \\.{}) {{ {item} in",
+                e(cx, arg("_")),
+                swift::ident(key)
+            ));
+            w.indent();
+            nodes(w, cx, &el.children);
+            w.dedent();
+            w.line("}");
+            w.dedent();
+            w.line("}");
+            w.dedent();
+            w.line("}");
+            trailing_modifiers(w, cx, &el.modifiers);
+        }
+        Builtin::Section => {
+            w.line("Section {");
+            w.indent();
+            nodes(w, cx, &el.children);
+            w.dedent();
+            let mut tail = "}".to_string();
+            for (label, key) in [("header", "header"), ("footer", "footer")] {
+                if let Some(Value::Expr(x)) = arg(key) {
+                    w.line(format!("{tail} {label}: {{"));
+                    w.indent();
+                    w.line(format!("Text({})", swift::expr(cx.expr, x)));
+                    w.dedent();
+                    tail = "}".to_string();
+                }
+            }
+            w.line(tail);
+            trailing_modifiers(w, cx, &el.modifiers);
+        }
+        Builtin::Form => container(w, cx, "Form", None, el),
+        Builtin::GroupBox => {
+            let head = match arg("_") {
+                Some(v) => format!("GroupBox({})", text_arg(cx, Some(v))),
+                None => "GroupBox".to_string(),
+            };
+            container(w, cx, &head, None, el);
+        }
+        Builtin::DisclosureGroup => {
+            let head = match arg("isExpanded") {
+                Some(b) => format!(
+                    "DisclosureGroup({}, isExpanded: {})",
+                    text_arg(cx, arg("_")),
+                    binding(cx, Some(b))
+                ),
+                None => format!("DisclosureGroup({})", text_arg(cx, arg("_"))),
+            };
+            container(w, cx, &head, None, el);
         }
         Builtin::List | Builtin::ForEach => {
             let name = if *b == Builtin::List {
@@ -419,6 +549,37 @@ fn modifier(cx: ViewCx, m: &Modifier) -> Vec<String> {
         ModifierKind::OnTap => vec![format!(".onTapGesture {{ {} }}", action(cx, arg("_")))],
         ModifierKind::AccessibilityLabel => {
             vec![format!(".accessibilityLabel({})", text_arg(cx, arg("_")))]
+        }
+        ModifierKind::Refreshable => {
+            let call = match arg("_").and_then(Value::as_action) {
+                Some(ActionRef::Dispatch {
+                    action,
+                    args,
+                    is_async,
+                }) => {
+                    let args: Vec<_> = args
+                        .iter()
+                        .map(|(n, v)| format!("{}: {}", n, swift::expr(cx.expr, v)))
+                        .collect();
+                    let call = format!("{}.{}({})", cx.vm, swift::ident(action), args.join(", "));
+                    if *is_async {
+                        format!("await {call}")
+                    } else {
+                        call
+                    }
+                }
+                Some(ActionRef::Param(name)) => format!("{}()", swift::ident(name)),
+                None => String::new(),
+            };
+            vec![format!(".refreshable {{ {call} }}")]
+        }
+        ModifierKind::Searchable => {
+            let mut s = format!(".searchable(text: {}", binding(cx, arg("text")));
+            if let Some(p) = arg("prompt") {
+                s.push_str(&format!(", prompt: {}", text_arg(cx, Some(p))));
+            }
+            s.push(')');
+            vec![s]
         }
         ModifierKind::SwiftUi => match &m.call {
             Some(call) => vec![format!(".{}", framework_call(cx, call))],

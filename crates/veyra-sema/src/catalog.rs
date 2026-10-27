@@ -69,6 +69,7 @@ const fn opt(label: &'static str, kind: ArgKind) -> ArgSpec {
     }
 }
 
+pub(crate) const AXES: &[&str] = &["vertical", "horizontal"];
 pub(crate) const H_ALIGN: &[&str] = &["leading", "center", "trailing"];
 pub(crate) const V_ALIGN: &[&str] = &["top", "center", "bottom"];
 pub(crate) const ALIGN: &[&str] = &[
@@ -122,7 +123,13 @@ pub(crate) fn element(builtin: Builtin) -> ElementSpec {
             Children::Required,
         ),
         Builtin::Stack => (vec![opt("alignment", Token(ALIGN))], Children::Required),
-        Builtin::ScrollView => (vec![], Children::Required),
+        Builtin::ScrollView => (
+            vec![
+                opt("axis", Token(AXES)),
+                opt("indicators", Expr(Type::Bool)),
+            ],
+            Children::Required,
+        ),
         Builtin::Text => (vec![req("_", Text)], Children::None),
         Builtin::Button => (vec![req("_", Text), req("action", Action)], Children::None),
         Builtin::TextField | Builtin::SecureField => (
@@ -147,6 +154,30 @@ pub(crate) fn element(builtin: Builtin) -> ElementSpec {
         Builtin::List | Builtin::ForEach => {
             (vec![req("_", List), req("key", KeyPath)], Children::Item)
         }
+        Builtin::LazyColumn | Builtin::LazyRow => (
+            vec![req("_", List), req("key", KeyPath), opt("spacing", Number)],
+            Children::Item,
+        ),
+        Builtin::LazyGrid => (
+            vec![
+                req("_", List),
+                req("key", KeyPath),
+                opt("columns", Expr(Type::Int)),
+                opt("minWidth", Number),
+                opt("spacing", Number),
+            ],
+            Children::Item,
+        ),
+        Builtin::Section => (
+            vec![opt("header", Text), opt("footer", Text)],
+            Children::Required,
+        ),
+        Builtin::Form => (vec![], Children::Required),
+        Builtin::GroupBox => (vec![opt("_", Text)], Children::Required),
+        Builtin::DisclosureGroup => (
+            vec![req("_", Text), opt("isExpanded", Binding(Type::Bool))],
+            Children::Required,
+        ),
     };
     ElementSpec { args, children }
 }
@@ -227,6 +258,14 @@ pub(crate) fn modifier(kind: ModifierKind) -> ModifierSpec {
         ModifierKind::Hidden => (vec![req("_", Expr(Type::Bool))], None),
         ModifierKind::OnTap => (vec![req("_", Action)], None),
         ModifierKind::AccessibilityLabel => (vec![req("_", Text)], None),
+        ModifierKind::Refreshable => (
+            vec![req("_", Action), opt("isRefreshing", Expr(Type::Bool))],
+            None,
+        ),
+        ModifierKind::Searchable => (
+            vec![req("text", Binding(Type::String)), opt("prompt", Text)],
+            None,
+        ),
     };
     ModifierSpec { args, applies_to }
 }

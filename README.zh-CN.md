@@ -68,6 +68,8 @@ View中的交互只有三种形式，编译器会在生成任何平台代码之�
 | 双向绑定 | `TextField(..., text: bind(query))` | state必须标记`@writable`，且类型与控件一致 |
 | 命令分发 | `Button(..., action: openCourse(course.id))` | 参数按action签名检查 |
 
+内置组件在所有平台上都可用。布局与集合包括`Column`、`Row`、`Stack`、`ScrollView(axis:)`、`LazyColumn`、`LazyRow`、`LazyGrid`、`List`、`ForEach`、`Form`、`Section`、`GroupBox`与`DisclosureGroup`，以及`.refreshable`与`.searchable`。
+
 View不能调用任意函数、修改状态或访问注入的依赖，有副作用的操作都放在action中，由ViewModel实现。
 
 每个文件只能看到自己的声明以及import的文件中的声明。import的路径相对于当前文件，且不会传递：

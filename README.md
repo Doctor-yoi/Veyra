@@ -68,6 +68,8 @@ Every interaction in a view falls into one of three forms, and the compiler chec
 | Two-way binding | `TextField(..., text: bind(query))` | The state must be marked `@writable`, and the type must match the control |
 | Command | `Button(..., action: openCourse(course.id))` | Arguments are checked against the action signature |
 
+Built-in components are available on every platform. Layout and collections include `Column`, `Row`, `Stack`, `ScrollView(axis:)`, `LazyColumn`, `LazyRow`, `LazyGrid`, `List`, `ForEach`, `Form`, `Section`, `GroupBox` and `DisclosureGroup`, together with `.refreshable` and `.searchable`.
+
 Views cannot call arbitrary functions, mutate state or access injected dependencies. Side effects belong in actions, which the view model implements.
 
 Each file sees only its own declarations and those of the files it imports. Import paths are relative to the current file, and imports are not transitive:

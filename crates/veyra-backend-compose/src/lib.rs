@@ -245,7 +245,12 @@ pub(crate) fn assemble(package: &str, im: &Imports, body: &str, notice: &str) ->
     w.line(format!("package {package}"));
     w.blank();
     let mut any = false;
-    for i in im.iter() {
+    let mut list: Vec<&str> = im.iter().map(String::as_str).collect();
+    if im.experimental {
+        list.push("androidx.compose.material3.ExperimentalMaterial3Api");
+        list.sort_unstable();
+    }
+    for i in list {
         // 同包内的类型无需导入
         if i.rsplit_once('.').is_some_and(|(p, _)| p == package) {
             continue;
@@ -258,7 +263,15 @@ pub(crate) fn assemble(package: &str, im: &Imports, body: &str, notice: &str) ->
     }
     let mut out = w.finish();
     out.push('\n');
-    out.push_str(body);
+    if im.experimental {
+        // 实验性Material3 API需要在函数上声明
+        out.push_str(&body.replace(
+            "@Composable\nfun ",
+            "@OptIn(ExperimentalMaterial3Api::class)\n@Composable\nfun ",
+        ));
+    } else {
+        out.push_str(body);
+    }
     out
 }
 
