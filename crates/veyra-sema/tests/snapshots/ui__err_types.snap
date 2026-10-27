@@ -132,7 +132,7 @@ error[V1012]: 未知的修饰符`.blur`
 43 |       Text("x").font(.huge).blur(3)
    |                             ^^^^
    |
-   = note: 内置修饰符：padding、font、foreground、background、frame、disabled、hidden、onTap、accessibilityLabel
+   = note: 内置修饰符：padding、font、foreground、background、frame、disabled、hidden、onTap、accessibilityLabel、refreshable、searchable
 
 error[V1011]: 未知的组件`Unknown`
   --> err_types.vey:44:7
@@ -140,7 +140,7 @@ error[V1011]: 未知的组件`Unknown`
 44 |       Unknown()
    |       ^^^^^^^
    |
-   = note: 内置组件：Column、Row、Stack、ScrollView、Text、Button、TextField、SecureField、Toggle、Slider、Image、Spacer、Divider、Progress、List、ForEach
+   = note: 内置组件：Column、Row、Stack、ScrollView、Text、Button、TextField、SecureField、Toggle、Slider、Image、Spacer、Divider、Progress、List、ForEach、LazyColumn、LazyRow、LazyGrid、Section、Form、GroupBox、DisclosureGroup
 
 error[V2034]: 组件`Spacer`不接受子组件
   --> err_types.vey:45:16

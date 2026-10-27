@@ -83,8 +83,7 @@ impl<'a> Checker<'a> {
                     .with_label(name.span, "")
                     .with_note(format!(
                         "内置组件：{}",
-                        Builtin::ALL
-                            .iter()
+                        Builtin::all()
                             .map(|b| b.name())
                             .collect::<Vec<_>>()
                             .join("、")
