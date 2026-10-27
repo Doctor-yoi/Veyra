@@ -35,11 +35,28 @@ screen Settings {
     Column(spacing: 16) {
       Text(loc("settings.title", "设置")).font(.title)
       Toggle(loc("settings.reminder", "上课提醒"), isOn: bind(reminder))
+        .padding(12)
+        #if ios
+        .ios.glassEffect()
+        #endif
       Slider(value: bind(volume), min: 0, max: 1)
       TextField(loc("settings.nickname", "昵称"), text: bind(nickname))
-      Button(loc("settings.save", "保存"), action: save).frame(maxWidth: .infinity)
+        .padding(12)
+        #if ios
+        .ios.glassEffect()
+        #endif
+      Button(loc("settings.save", "保存"), action: save)
+        .frame(maxWidth: .infinity)
+        .padding(12)
+        #if ios
+        .ios.glassEffect()
+        #endif
       if signedIn {
         Button(loc("settings.sign_out", "退出登录"), action: signOut)
+          .padding(12)
+          #if ios
+          .ios.glassEffect()
+          #endif
       }
     }
     .padding()

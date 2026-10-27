@@ -28,13 +28,26 @@ screen Notes {
   view {
     Column(spacing: 12) {
       TextField(loc("notes.draft", "写点什么"), text: bind(draft))
-      Button(loc("notes.add", "添加"), action: add).disabled(!canAdd)
+        .padding(12)
+        #if ios
+        .ios.glassEffect()
+        #endif
+      Button(loc("notes.add", "添加"), action: add)
+        .disabled(!canAdd)
+        .padding(12)
+        #if ios
+        .ios.glassEffect()
+        #endif
       List(items, key: .id) { note in
         Row {
           Text(note.text)
           Spacer()
           Text(format(note.createdAt, .date(.short))).foreground(.secondary)
         }
+        .padding(12)
+        #if ios
+        .ios.glassEffect()
+        #endif
         .onTap(remove(note.id))
       }
     }
