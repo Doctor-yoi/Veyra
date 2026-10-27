@@ -174,11 +174,11 @@ const SCROLLABLES: &[Builtin] = &[Builtin::ScrollView, Builtin::List];
 pub(crate) fn platform_element(platform: &str, name: &str) -> Option<(ElementKind, ElementSpec)> {
     use ArgKind::*;
     let (kind, args) = match (platform, name) {
-        ("ios", "ShareLink") => (
+        ("swiftui", "ShareLink") => (
             ElementKind::Ios(IosElement::ShareLink),
             vec![req("_", Text), req("item", Expr(Type::String))],
         ),
-        ("android", "FloatingActionButton") => (
+        ("compose", "FloatingActionButton") => (
             ElementKind::Android(AndroidElement::FloatingActionButton),
             vec![req("_", Text), req("action", Action)],
         ),
@@ -207,20 +207,20 @@ pub(crate) const ANDROID_MODIFIERS: &[&str] = &["imePadding", "systemBarsPadding
 /// 平台专属修饰符
 pub(crate) fn platform_modifier(platform: &str, name: &str) -> Option<ModifierKind> {
     Some(match (platform, name) {
-        ("ios", "glassEffect") => ModifierKind::Ios(IosModifier::GlassEffect),
-        ("ios", "navigationTitle") => ModifierKind::Ios(IosModifier::NavigationTitle),
-        ("ios", "textInputAutocapitalization") => {
+        ("swiftui", "glassEffect") => ModifierKind::Ios(IosModifier::GlassEffect),
+        ("swiftui", "navigationTitle") => ModifierKind::Ios(IosModifier::NavigationTitle),
+        ("swiftui", "textInputAutocapitalization") => {
             ModifierKind::Ios(IosModifier::TextInputAutocapitalization)
         }
-        ("ios", "listStyle") => ModifierKind::Ios(IosModifier::ListStyle),
-        ("ios", "scrollDismissesKeyboard") => {
+        ("swiftui", "listStyle") => ModifierKind::Ios(IosModifier::ListStyle),
+        ("swiftui", "scrollDismissesKeyboard") => {
             ModifierKind::Ios(IosModifier::ScrollDismissesKeyboard)
         }
-        ("android", "imePadding") => ModifierKind::Android(AndroidModifier::ImePadding),
-        ("android", "systemBarsPadding") => {
+        ("compose", "imePadding") => ModifierKind::Android(AndroidModifier::ImePadding),
+        ("compose", "systemBarsPadding") => {
             ModifierKind::Android(AndroidModifier::SystemBarsPadding)
         }
-        ("android", "testTag") => ModifierKind::Android(AndroidModifier::TestTag),
+        ("compose", "testTag") => ModifierKind::Android(AndroidModifier::TestTag),
         _ => return None,
     })
 }

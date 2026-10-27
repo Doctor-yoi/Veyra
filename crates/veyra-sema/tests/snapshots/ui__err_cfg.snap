@@ -17,7 +17,7 @@ error[V6001]: 未声明的条件`unknown_flag`
 6 | #if premium || unknown_flag
   |                ^^^^^^^^^^^^
   |
-  = note: 可用的条件：ios、android、harmony、debug，以及veyra.toml中[flags]声明的名称
+  = note: 可用的条件：apple、android、harmony、ios、macos、watchos、tvos、visionos、debug，以及veyra.toml中[flags]声明的名称
 
 error[V3020]: screen`Empty`缺少view
   --> err_cfg.vey:30:8
@@ -50,7 +50,7 @@ error[V6001]: 未声明的条件`unknown_flag`
 6 | #if premium || unknown_flag
   |                ^^^^^^^^^^^^
   |
-  = note: 可用的条件：ios、android、harmony、debug，以及veyra.toml中[flags]声明的名称
+  = note: 可用的条件：apple、android、harmony、ios、macos、watchos、tvos、visionos、debug，以及veyra.toml中[flags]声明的名称
 
 error[V1010]: 未定义的state`faceId`
   --> err_cfg.vey:25:31

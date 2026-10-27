@@ -3,77 +3,85 @@ source: crates/veyra-sema/tests/ui.rs
 expression: out
 ---
 [ios]
-error[V1011]: 未知的组件`ios.Unknown`
-  --> err_platform.vey:13:11
+error[V1011]: 未知的组件`swiftui.Unknown`
+  --> err_platform.vey:13:15
    |
-13 |       ios.Unknown()
-   |           ^^^^^^^
+13 |       swiftui.Unknown()
+   |               ^^^^^^^
    |
-   = note: ios专属组件：ShareLink
+   = note: swiftui专属组件：ShareLink
 
-error[V1012]: 未知的修饰符`.ios.blur`
-  --> err_platform.vey:14:21
+error[V1012]: 未知的修饰符`.swiftui.blur`
+  --> err_platform.vey:14:25
    |
-14 |       Text("x").ios.blur()
-   |                     ^^^^
+14 |       Text("x").swiftui.blur()
+   |                         ^^^^
    |
-   = note: ios专属修饰符：glassEffect、navigationTitle、textInputAutocapitalization、listStyle、scrollDismissesKeyboard
+   = note: swiftui专属修饰符：glassEffect、navigationTitle、textInputAutocapitalization、listStyle、scrollDismissesKeyboard
 
-error[V1011]: 未知的平台`windows`
-  --> err_platform.vey:16:7
+error[V6020]: `ios.*`已改名为`swiftui.*`
+  --> err_platform.vey:15:7
    |
-16 |       windows.Button()
-   |       ^^^^^^^ 可用的平台：ios、android
+15 |       ios.ShareLink("旧写法", item: title)
+   |       ^^^ 改为`swiftui`
+   |
+   = note: 平台专属API按框架命名，系统差异请使用#if ios、#if macos等条件
+
+error[V1011]: 未知的框架`windows`
+  --> err_platform.vey:17:7
+   |
+17 |       windows.Button()
+   |       ^^^^^^^ 可用的框架：swiftui、compose
 
 error[V6003]: `.font`不能放在`debug`条件中
-  --> err_platform.vey:19:10
+  --> err_platform.vey:20:10
    |
-19 |         .font(.title)
+20 |         .font(.title)
    |          ^^^^
    |
    = note: 该修饰符在Compose中会生成为组件参数，无法按构建类型切换
 
 warning[V6010]: native代码块不受Veyra的类型检查与MVVM约束
-  --> err_platform.vey:22:7
+  --> err_platform.vey:23:7
    |
-22 |       native ios {
-   |       ^^^^^^^^^^^^
+23 |       native swiftui {
+   |       ^^^^^^^^^^^^^^^^
    |
    = note: 可在veyra.toml的[lint]中设置native = "allow"或"deny"
 
 error[V1010]: 未定义的名称`missing`
-  --> err_platform.vey:23:9
+  --> err_platform.vey:24:9
    |
-23 |         """
+24 |         """
    |         ^^^
 
 error[V6011]: 无效的占位符`{{a b}}`
-  --> err_platform.vey:23:9
+  --> err_platform.vey:24:9
    |
-23 |         """
+24 |         """
    |         ^^^ 占位符只能是名称或字段路径
 
-error: 共6个错误，1个警告
+error: 共7个错误，1个警告
 
 [android]
-error[V6004]: `ios.ShareLink`只能用于ios
+error[V6004]: `swiftui.ShareLink`只能用于swiftui
   --> err_platform.vey:11:7
    |
-11 |       ios.ShareLink("分享", item: title)
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+11 |       swiftui.ShareLink("分享", item: title)
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = note: 请放在`#if ios`条件块中
+   = note: 请放在`#if apple`条件块中
 
-error[V1011]: 未知的平台`windows`
-  --> err_platform.vey:16:7
+error[V1011]: 未知的框架`windows`
+  --> err_platform.vey:17:7
    |
-16 |       windows.Button()
-   |       ^^^^^^^ 可用的平台：ios、android
+17 |       windows.Button()
+   |       ^^^^^^^ 可用的框架：swiftui、compose
 
 error[V6003]: `.font`不能放在`debug`条件中
-  --> err_platform.vey:19:10
+  --> err_platform.vey:20:10
    |
-19 |         .font(.title)
+20 |         .font(.title)
    |          ^^^^
    |
    = note: 该修饰符在Compose中会生成为组件参数，无法按构建类型切换

@@ -72,7 +72,7 @@ screen Schedule {
       Text(loc("schedule.title", "我的课表")).font(.title)
       TextField(loc("schedule.search", "搜索"), text: bind(query))
         #if ios
-        .ios.glassEffect()
+        .swiftui.glassEffect()
         #endif
       if items.isEmpty {
         Text("empty")
@@ -84,7 +84,7 @@ screen Schedule {
         Spacer()
       }
       #if ios && !debug
-      native ios {
+      native swiftui {
         """
         Text(verbatim: "{{query}}")
         """
