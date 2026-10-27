@@ -155,3 +155,15 @@ fn keeps_user_owned_files() {
     assert_eq!(std::fs::read_to_string(&vm).unwrap(), "// custom");
     assert!(Path::new(&p.path(".veyra/manifest.json")).is_file());
 }
+
+#[test]
+fn rejects_declarations_split_by_apple_system() {
+    let config = "[project]\nname = \"Demo\"\n\n[swiftui]\nplatforms = [\"ios\", \"macos\"]\n\n[compose]\npackage = \"com.example.demo\"\n";
+    let ui = "screen Home {\n  state {\n    #if ios\n    title: String = \"a\"\n    #else\n    title: String = \"b\"\n    #endif\n  }\n  actions {\n    load()\n  }\n  #if ios\n  lifecycle {\n    onAppear: load\n  }\n  #endif\n  view {\n    Text(title)\n  }\n}\n";
+    let p = TempProject::new("split", &[("veyra.toml", config), ("ui/home.vey", ui)]);
+    let (ok, out) = p.run(&["check"]);
+    assert!(!ok, "{out}");
+    assert!(out.contains("V1003"), "{out}");
+    assert!(out.contains("按系统区分的声明也不能重名"), "{out}");
+    assert!(out.contains("lifecycle块不能按Apple系统区分"), "{out}");
+}
