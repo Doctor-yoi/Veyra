@@ -49,6 +49,8 @@ pub(crate) struct Scope<'s> {
     pub allow_loc: bool,
     /// 外层`if available(...)`提高的系统版本
     pub available: Vec<(veyra_ir::AppleOs, veyra_catalog::Version)>,
+    /// 位于Picker内容中时为selection的类型
+    pub picker: Option<Type>,
 }
 
 impl<'s> Scope<'s> {
@@ -58,6 +60,7 @@ impl<'s> Scope<'s> {
             locals: Vec::new(),
             allow_loc,
             available: Vec::new(),
+            picker: None,
         }
     }
 
@@ -183,7 +186,7 @@ impl<'a> Checker<'a> {
             self.diags.push(
                 Diagnostic::error("V2011", "默认值必须是常量")
                     .with_label(e.span, "")
-                    .with_note("可以使用字面量、列表字面量、枚举成员与nil"),
+                    .with_note("可以使用字面量、列表字面量、枚举成员、nil与now()"),
             );
             return ir::Expr::unknown();
         }
@@ -424,6 +427,12 @@ impl<'a> Checker<'a> {
             A::Ident(n) if n == "loc" => return self.loc(sc, args, span),
             A::Ident(n) if n == "plural" => return self.plural(sc, args, span),
             A::Ident(n) if n == "format" => return self.format(sc, args, span),
+            A::Ident(n) if n == "now" => {
+                if !args.is_empty() {
+                    self.error("V2035", "now()不接受参数", span, "");
+                }
+                return ir::Expr::new(ExprKind::Now, Type::Date);
+            }
             A::Ident(n) if n == "bind" => {
                 self.error(
                     "V3013",
@@ -1217,6 +1226,9 @@ fn is_constant(e: &ast::Expr) -> bool {
         A::Unary(ast::UnaryOp::Neg, inner) => matches!(inner.kind, A::Int(_) | A::Float(..)),
         A::List(items) => items.iter().all(is_constant),
         A::Paren(inner) => is_constant(inner),
+        A::Call(callee, args) => {
+            args.is_empty() && matches!(&callee.kind, A::Ident(n) if n == "now")
+        }
         _ => false,
     }
 }

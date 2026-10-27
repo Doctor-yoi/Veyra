@@ -3,13 +3,42 @@
 
 //! `swiftui.*`：按SDK目录做重载解析、参数类型检查与系统版本检查
 
+use indexmap::IndexMap;
 use veyra_catalog::{Availability, OsAvailability, Param, ParamType, Signature, TextKind, Version};
 use veyra_diagnostics::{Diagnostic, Span};
-use veyra_ir::{self as ir, FrameworkArg, FrameworkCall, FrameworkValue, SwiftConv, Type};
+use veyra_ir::{
+    self as ir, AppleOs, Builtin, FrameworkArg, FrameworkCall, FrameworkValue, NativeCond,
+    SwiftConv, Type, Value, Worlds,
+};
 use veyra_syntax::ast::{self, Arg, ExprKind as A};
 
 use crate::Checker;
 use crate::expr::Scope;
+
+/// 合并多个重载的可用性：任一重载可用即可用，引入版本取最低者
+fn merge_availability<'c>(items: impl Iterator<Item = &'c Availability>) -> Availability {
+    let mut out = Availability::new();
+    for avail in items {
+        for (os, a) in avail {
+            let merged = match (out.get(os), a) {
+                (None | Some(OsAvailability::Unavailable), a) => a.clone(),
+                (Some(prev), OsAvailability::Unavailable) => prev.clone(),
+                (
+                    Some(OsAvailability::Available { introduced: x, .. }),
+                    OsAvailability::Available { introduced: y, .. },
+                ) => OsAvailability::Available {
+                    introduced: match (x, y) {
+                        (Some(x), Some(y)) => Some(*x.min(y)),
+                        _ => None,
+                    },
+                    deprecated: None,
+                },
+            };
+            out.insert(os.clone(), merged);
+        }
+    }
+    out
+}
 
 /// 参数类型的可读写法，用于诊断
 fn describe(t: &ParamType) -> String {
@@ -154,6 +183,68 @@ impl<'a> Checker<'a> {
                 true
             }
         }
+    }
+
+    /// 通用组件按对应的SwiftUI类型检查系统可用性，样式取值按样式协议的成员检查
+    pub(crate) fn check_builtin_availability(
+        &mut self,
+        sc: &Scope,
+        builtin: Builtin,
+        args: &IndexMap<String, Value>,
+        span: Span,
+    ) {
+        if self.target.platform != ir::Platform::Apple {
+            return;
+        }
+        let (view, style) = match builtin {
+            Builtin::Picker => ("Picker", Some("PickerStyle")),
+            Builtin::DatePicker => ("DatePicker", Some("DatePickerStyle")),
+            Builtin::Progress => ("ProgressView", Some("ProgressViewStyle")),
+            Builtin::Stepper => ("Stepper", None),
+            Builtin::Menu => ("Menu", None),
+            Builtin::Link => ("Link", None),
+            Builtin::TextEditor => ("TextEditor", None),
+            Builtin::Label => ("Label", None),
+            Builtin::Gauge => ("Gauge", None),
+            _ => return,
+        };
+        let catalog = veyra_catalog::swiftui();
+        if let Some(sigs) = catalog.views.get(view) {
+            let avail = merge_availability(sigs.iter().map(|s| &s.availability));
+            if !self.check_availability(sc, builtin.name(), &avail, span) {
+                return;
+            }
+        }
+        let token = args.get("style").and_then(Value::as_token);
+        if let (Some(proto), Some(token)) = (style, token)
+            && let Some(members) = catalog.protocols.get(proto).and_then(|m| m.get(token))
+        {
+            let avail = merge_availability(members.iter().map(|m| &m.availability));
+            let what = format!("{}(style: .{token})", builtin.name());
+            self.check_availability(sc, &what, &avail, span);
+        }
+    }
+
+    /// 只存在于部分系统的修饰符所需的附加条件，外层为None表示当前目标上都不可用
+    pub(crate) fn os_restriction(&self, allowed: &[AppleOs]) -> Option<Option<NativeCond>> {
+        if self.target.platform != ir::Platform::Apple {
+            return Some(None);
+        }
+        if let Some(os) = self.cfg.fixed_os() {
+            return allowed.contains(&os).then_some(None);
+        }
+        let residual = self.cfg.residual();
+        let mut worlds = Worlds::empty(residual.len());
+        for (i, os) in residual.iter().enumerate() {
+            if allowed.contains(os) {
+                worlds.insert(i, false);
+                worlds.insert(i, true);
+            }
+        }
+        if worlds.is_empty() {
+            return None;
+        }
+        Some(worlds.to_cond(residual))
     }
 
     /// 检查一个实参，错误写入诊断

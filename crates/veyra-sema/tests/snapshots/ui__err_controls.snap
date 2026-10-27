@@ -1,0 +1,65 @@
+---
+source: crates/veyra-sema/tests/ui.rs
+expression: out
+---
+error[V2047]: `Picker`的内容只能是`Option`
+  --> err_controls.vey:16:43
+   |
+16 |       Picker("模式", selection: bind(mode)) {
+   |                                             ^
+   |
+   = note: 动态选项写成`ForEach(items, key: .id) { item in Option(...) }`
+
+error[V2001]: 类型不匹配：期望`Mode`，实际为`String`
+  --> err_controls.vey:18:29
+   |
+18 |         Option("错误", value: "dark")
+   |                               ^^^^^^ 类型为`String`
+
+error[V2046]: `Picker`的selection不能是`Double`
+  --> err_controls.vey:21:31
+   |
+21 |       Picker("比例", selection: bind(ratio)) {
+   |                                 ^^^^^^^^^^^ 可用类型：Int、String、Bool、enum及其可选类型
+
+error[V2045]: `Option`只能用于`Picker`中
+  --> err_controls.vey:24:7
+   |
+24 |       Option("孤立", value: 1)
+   |       ^^^^^^
+
+error[V2046]: `Stepper`的value不能是`String`
+  --> err_controls.vey:25:28
+   |
+25 |       Stepper("名称", value: bind(name))
+   |                              ^^^^^^^^^^ 可用类型：Int、Double
+
+error[V2001]: 类型不匹配：期望`Int`，实际为`Double`
+  --> err_controls.vey:26:46
+   |
+26 |       Stepper("数量", value: bind(count), max: 1.5)
+   |                                                ^^^ 类型为`Double`
+
+error[V2042]: `.keyboard`不能用于`Text`
+  --> err_controls.vey:27:17
+   |
+27 |       Text("x").keyboard(.email)
+   |                 ^^^^^^^^
+   |
+   = note: 可用于：TextField、SecureField
+
+error[V2044]: 无效的取值
+  --> err_controls.vey:28:50
+   |
+28 |       TextField("名称", text: bind(name)).keyboard(.qwerty)
+   |                                                    ^^^^^^^
+   |
+   = note: 可用取值：.default、.email、.number、.decimal、.phone、.url
+
+error[V2001]: 类型不匹配：期望`Date`，实际为`String`
+  --> err_controls.vey:29:40
+   |
+29 |       DatePicker("日期", selection: bind(name))
+   |                                          ^^^^ 类型为`String`
+
+error: 共9个错误，0个警告
