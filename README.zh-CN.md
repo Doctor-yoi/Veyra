@@ -68,7 +68,7 @@ View中的交互只有三种形式，编译器会在生成任何平台代码之�
 | 双向绑定 | `TextField(..., text: bind(query))` | state必须标记`@writable`，且类型与控件一致 |
 | 命令分发 | `Button(..., action: openCourse(course.id))` | 参数按action签名检查 |
 
-内置组件在所有平台上都可用。布局与集合包括`Column`、`Row`、`Stack`、`ScrollView(axis:)`、`LazyColumn`、`LazyRow`、`LazyGrid`、`List`、`ForEach`、`Form`、`Section`、`GroupBox`与`DisclosureGroup`，以及`.refreshable`与`.searchable`。
+内置组件在所有平台上都可用。布局与集合包括`Column`、`Row`、`Stack`、`ScrollView(axis:)`、`LazyColumn`、`LazyRow`、`LazyGrid`、`List`、`ForEach`、`Form`、`Section`、`GroupBox`与`DisclosureGroup`，以及`.refreshable`与`.searchable`。控件包括`Button(role:)`、`TextField`、`SecureField`、`TextEditor`、`Toggle`、`Slider`、`Stepper`、由`Option`组成并支持菜单、分段与列表样式的`Picker`、`DatePicker`、`Menu`、`Link`、`Label`、`Gauge`与`Progress`。文本框支持`.keyboard`、`.submitLabel`、`.onSubmit`与`.autocapitalization`，只存在于部分系统的修饰符会自动包裹在`#if os(...)`中。组件在某个已启用的系统上不可用时（例如tvOS上的`Stepper`）会按系统报错。`now()`表示当前时间，可以作为`Date`类型state的默认值。Android上`Label`会把SF Symbols映射为Material图标，需要依赖`androidx.compose.material:material-icons-core`。
 
 View不能调用任意函数、修改状态或访问注入的依赖，有副作用的操作都放在action中，由ViewModel实现。
 

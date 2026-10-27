@@ -19,6 +19,7 @@ mod preferences;
 mod resources;
 mod screen;
 mod storage;
+mod symbols;
 mod view;
 
 use std::path::PathBuf;
@@ -153,6 +154,9 @@ impl Backend for ComposeBackend {
                 file("VeyraFormat"),
                 format_helpers(&options),
             ));
+        }
+        if let Some(helpers) = control_helpers(program, &options) {
+            files.push(OutputFile::generated(file("VeyraControls"), helpers));
         }
         files.extend(resources::strings(input.catalog, &options.res)?);
 
@@ -399,6 +403,86 @@ internal fun veyraFormatDate(value: Instant, date: FormatStyle? = null, time: Fo
     generated(&options.package, &im, body)
 }
 
+/// 日期选择与动态图标使用的辅助函数，没有用到时不生成
+fn control_helpers(program: &Program, options: &Options) -> Option<String> {
+    use veyra_ir::{Builtin, ElementKind, ExprKind, ViewNode};
+    let is = |n: &ViewNode, b: Builtin| matches!(n, ViewNode::Element(el) if el.kind == ElementKind::Builtin(b));
+    let dates = program.any_node(|n| is(n, Builtin::DatePicker));
+    let symbols = program.any_node(|n| match n {
+        ViewNode::Element(el) if el.kind == ElementKind::Builtin(Builtin::Label) => !matches!(
+            el.arg("icon").and_then(veyra_ir::Value::as_expr),
+            Some(veyra_ir::Expr {
+                kind: ExprKind::String(_),
+                ..
+            })
+        ),
+        _ => false,
+    });
+    if !dates && !symbols {
+        return None;
+    }
+    let mut im = Imports::new(options.r_package());
+    let mut body = String::new();
+    if dates {
+        for i in [
+            "java.time.Instant",
+            "java.time.ZoneId",
+            "java.time.ZoneOffset",
+            "java.time.format.DateTimeFormatter",
+            "java.time.format.FormatStyle",
+        ] {
+            im.add(i);
+        }
+        body.push_str(
+            r#"/** Date picker dialogs work with UTC midnight, convert from and to the local date of a value */
+internal fun veyraDateMillis(value: Instant): Long =
+    value.atZone(ZoneId.systemDefault()).toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+
+internal fun veyraWithDate(value: Instant, utcMillis: Long): Instant {
+    val date = Instant.ofEpochMilli(utcMillis).atZone(ZoneOffset.UTC).toLocalDate()
+    return value.atZone(ZoneId.systemDefault()).with(date).toInstant()
+}
+
+internal fun veyraHour(value: Instant): Int = value.atZone(ZoneId.systemDefault()).hour
+
+internal fun veyraMinute(value: Instant): Int = value.atZone(ZoneId.systemDefault()).minute
+
+internal fun veyraWithTime(value: Instant, hour: Int, minute: Int): Instant =
+    value.atZone(ZoneId.systemDefault()).withHour(hour).withMinute(minute).withSecond(0).withNano(0).toInstant()
+
+internal fun veyraDateLabel(value: Instant, date: Boolean, time: Boolean): String {
+    val formatter = when {
+        date && time -> DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
+        date -> DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
+        else -> DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
+    }
+    return formatter.withZone(ZoneId.systemDefault()).format(value)
+}
+"#,
+        );
+    }
+    if symbols {
+        im.add("androidx.compose.material.icons.Icons");
+        im.add("androidx.compose.ui.graphics.vector.ImageVector");
+        let mut seen = std::collections::BTreeSet::new();
+        if dates {
+            body.push('\n');
+        }
+        body.push_str(
+            "/** Material icon for an SF Symbol name, null when there is no counterpart */\n",
+        );
+        body.push_str("internal fun veyraSymbol(name: String): ImageVector? = when (name) {\n");
+        for (symbol, icon) in symbols::SYMBOLS {
+            if seen.insert(*icon) {
+                im.add(&format!("androidx.compose.material.icons.filled.{icon}"));
+            }
+            body.push_str(&format!("    \"{symbol}\" -> Icons.Default.{icon}\n"));
+        }
+        body.push_str("    else -> null\n}\n");
+    }
+    Some(generated(&options.package, &im, &body))
+}
+
 fn components(program: &Program, options: &Options) -> String {
     let mut im = Imports::new(options.r_package());
     im.add("androidx.compose.runtime.Composable");
@@ -434,6 +518,7 @@ fn components(program: &Program, options: &Options) -> String {
             actions: "",
             im: &mut im,
             temp: 0,
+            menu: None,
         };
         match c.body.as_slice() {
             [veyra_ir::ViewNode::Element(root)] => {

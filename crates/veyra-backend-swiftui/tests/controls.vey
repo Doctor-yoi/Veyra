@@ -1,0 +1,72 @@
+enum SortOrder {
+  title
+  created
+}
+
+model Tag {
+  id: String
+  title: String
+  icon: String
+}
+
+screen Settings {
+  state {
+    order: SortOrder = .title @writable
+    tag: String? = nil @writable
+    tags: List<Tag> = []
+    due: Date = now() @writable
+    count: Int = 1 @writable
+    volume: Double = 0.5 @writable
+    notes: String = "" @writable
+    email: String = "" @writable
+    progress: Double = 0.3
+  }
+
+  actions {
+    save() async
+    reset()
+    submit()
+  }
+
+  view {
+    Form {
+      Picker("排序", selection: bind(order), style: .segmented) {
+        Option("名称", value: .title)
+        Option("日期", value: .created)
+      }
+      Picker("标签", selection: bind(tag)) {
+        Option("无", value: nil)
+        ForEach(tags, key: .id) { t in
+          Option(t.title, value: t.id)
+        }
+      }
+      Picker("方式", selection: bind(order), style: .inline) {
+        Option("名称", value: .title)
+        Option("日期", value: .created)
+      }
+      DatePicker("截止", selection: bind(due), components: .date)
+      DatePicker("提醒", selection: bind(due))
+      Stepper("数量", value: bind(count), min: 1, max: 10)
+      Stepper("音量", value: bind(volume), min: 0, max: 1, step: 0.1)
+      TextEditor(text: bind(notes))
+      TextField("邮箱", text: bind(email))
+        .keyboard(.email)
+        .autocapitalization(.never)
+        .submitLabel(.done)
+        .onSubmit(submit)
+      Menu("更多") {
+        Button("保存", action: save)
+        Divider()
+        Button("重置", role: .destructive, action: reset)
+      }
+      Link("帮助", url: "https://example.com/help")
+      Label("收藏", icon: "star.fill")
+      ForEach(tags, key: .id) { t in
+        Label(t.title, icon: t.icon)
+      }
+      Gauge(value: progress, label: "进度")
+      Progress("加载", value: progress, total: 1, style: .circular)
+      Button("取消", role: .cancel, action: reset)
+    }
+  }
+}
